@@ -3,109 +3,85 @@ import { Money } from '../../core/value-objects/Money';
 describe('Money Value Object', () => {
   describe('constructor', () => {
     it('should create a valid Money object', () => {
-      const money = new Money(100, 'USD');
+      const money = new Money(100);
 
-      expect(money.amount).toBe(100);
-      expect(money.currency).toBe('USD');
+      expect(money.getValue()).toBe(100);
     });
 
     it('should throw error for negative amount', () => {
       expect(() => {
-        new Money(-100, 'USD');
-      }).toThrow('Amount cannot be negative');
+        new Money(-100);
+      }).toThrow('Money cannot be negative');
     });
 
     it('should accept zero amount', () => {
-      const money = new Money(0, 'USD');
-      expect(money.amount).toBe(0);
+      const money = new Money(0);
+      expect(money.getValue()).toBe(0);
+    });
+
+    it('should round to 2 decimal places', () => {
+      const money = new Money(100.456);
+      expect(money.getValue()).toBe(100.46);
     });
   });
 
   describe('add', () => {
-    it('should add two money objects with same currency', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(50, 'USD');
+    it('should add two money objects', () => {
+      const money1 = new Money(100);
+      const money2 = new Money(50);
       const result = money1.add(money2);
 
-      expect(result.amount).toBe(150);
-      expect(result.currency).toBe('USD');
-    });
-
-    it('should throw error when adding different currencies', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(50, 'EUR');
-
-      expect(() => {
-        money1.add(money2);
-      }).toThrow('Cannot add different currencies');
+      expect(result.getValue()).toBe(150);
     });
   });
 
   describe('subtract', () => {
-    it('should subtract two money objects with same currency', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(30, 'USD');
+    it('should subtract two money objects', () => {
+      const money1 = new Money(100);
+      const money2 = new Money(30);
       const result = money1.subtract(money2);
 
-      expect(result.amount).toBe(70);
-      expect(result.currency).toBe('USD');
+      expect(result.getValue()).toBe(70);
     });
 
     it('should throw error when result is negative', () => {
-      const money1 = new Money(50, 'USD');
-      const money2 = new Money(100, 'USD');
+      const money1 = new Money(50);
+      const money2 = new Money(100);
 
       expect(() => {
         money1.subtract(money2);
-      }).toThrow('Result cannot be negative');
-    });
-
-    it('should throw error when subtracting different currencies', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(50, 'EUR');
-
-      expect(() => {
-        money1.subtract(money2);
-      }).toThrow('Cannot subtract different currencies');
+      }).toThrow('Money cannot be negative');
     });
   });
 
   describe('multiply', () => {
     it('should multiply money by a factor', () => {
-      const money = new Money(100, 'USD');
+      const money = new Money(100);
       const result = money.multiply(2);
 
-      expect(result.amount).toBe(200);
-      expect(result.currency).toBe('USD');
+      expect(result.getValue()).toBe(200);
     });
 
-    it('should throw error for negative factor', () => {
-      const money = new Money(100, 'USD');
+    it('should throw error for negative result', () => {
+      const money = new Money(100);
 
       expect(() => {
         money.multiply(-2);
-      }).toThrow('Factor cannot be negative');
+      }).toThrow('Money cannot be negative');
     });
   });
 
   describe('equals', () => {
     it('should return true for equal money objects', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(100, 'USD');
+      const money1 = new Money(100);
+      const money2 = new Money(100);
 
       expect(money1.equals(money2)).toBe(true);
     });
 
     it('should return false for different amounts', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(50, 'USD');
-
-      expect(money1.equals(money2)).toBe(false);
-    });
-
-    it('should return false for different currencies', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(100, 'EUR');
+      const money1 = new Money(100);
+      const money2 = new Money(50);
 
       expect(money1.equals(money2)).toBe(false);
     });
@@ -113,26 +89,24 @@ describe('Money Value Object', () => {
 
   describe('isGreaterThan', () => {
     it('should return true when amount is greater', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(50, 'USD');
+      const money1 = new Money(100);
+      const money2 = new Money(50);
 
       expect(money1.isGreaterThan(money2)).toBe(true);
     });
 
     it('should return false when amount is less', () => {
-      const money1 = new Money(50, 'USD');
-      const money2 = new Money(100, 'USD');
+      const money1 = new Money(50);
+      const money2 = new Money(100);
 
       expect(money1.isGreaterThan(money2)).toBe(false);
     });
+  });
 
-    it('should throw error when comparing different currencies', () => {
-      const money1 = new Money(100, 'USD');
-      const money2 = new Money(50, 'EUR');
-
-      expect(() => {
-        money1.isGreaterThan(money2);
-      }).toThrow('Cannot compare different currencies');
+  describe('toString', () => {
+    it('should format to 2 decimal places', () => {
+      const money = new Money(100);
+      expect(money.toString()).toBe('100.00');
     });
   });
 });

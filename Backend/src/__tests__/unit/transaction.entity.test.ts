@@ -66,7 +66,8 @@ describe('Transaction Entity', () => {
           validData.description,
           validData.date,
           validData.createdAt,
-          validData.updatedAt
+          validData.updatedAt,
+          validData.deletedAt
         );
       }).toThrow('Amount must be positive');
     });

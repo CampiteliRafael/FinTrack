@@ -1,6 +1,6 @@
 import { Worker } from 'bullmq';
 import { queueConnection } from '../queues/queue.config';
-import { prisma } from '../config/database';
+import prisma from '../config/database';
 
 /**
  * Worker para processar receitas mensais automáticas

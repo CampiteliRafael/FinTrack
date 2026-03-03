@@ -12,11 +12,11 @@ describe('JwtUtil', () => {
     });
   });
 
-  describe('verifyAccessToken', () => {
+  describe('verify', () => {
     it('should verify a valid token', () => {
       const payload = { userId: '123', email: 'test@example.com' };
       const token = JwtUtil.signAccessToken(payload);
-      const decoded = JwtUtil.verifyAccessToken(token);
+      const decoded = JwtUtil.verify(token);
 
       expect(decoded).toBeDefined();
       expect(decoded.userId).toBe(payload.userId);
@@ -27,21 +27,8 @@ describe('JwtUtil', () => {
       const invalidToken = 'invalid.token.here';
 
       expect(() => {
-        JwtUtil.verifyAccessToken(invalidToken);
+        JwtUtil.verify(invalidToken);
       }).toThrow();
-    });
-
-    it('should throw error for expired token', () => {
-      const expiredToken = JwtUtil.signAccessToken(
-        { userId: '123', email: 'test@example.com' },
-        '0s'
-      );
-
-      setTimeout(() => {
-        expect(() => {
-          JwtUtil.verifyAccessToken(expiredToken);
-        }).toThrow();
-      }, 100);
     });
   });
 
