@@ -18,6 +18,8 @@ import { swaggerUi, swaggerDocument, swaggerOptions } from './config/swagger';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(
   helmet({
     contentSecurityPolicy: false, // Disable for Swagger UI
