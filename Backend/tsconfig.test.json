@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "types": ["node", "jest"],
+    "noImplicitAny": false
+  },
+  "include": ["src/**/*", "src/__tests__/**/*"]
+}

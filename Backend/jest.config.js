@@ -3,6 +3,16 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        strict: false,
+        types: ['node', 'jest'],
+        noImplicitAny: false,
+        skipLibCheck: true,
+      },
+    },
+  },
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
