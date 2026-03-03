@@ -2,8 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ThemeProvider, useTheme } from '../../contexts/ThemeContext';
 
-const THEME_STORAGE_KEY = 'fintrack-theme';
-
 // Component to test the hook
 function TestComponent() {
   const { theme, toggleTheme } = useTheme();

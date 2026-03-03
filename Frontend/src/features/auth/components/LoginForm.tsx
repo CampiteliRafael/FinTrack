@@ -41,11 +41,6 @@ export function LoginForm() {
     }
   }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleSubmit(onSubmit)(e);
-  };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />

@@ -6,9 +6,16 @@ export interface Account {
   userId: string;
   name: string;
   initialBalance: number;
+  currentBalance: number;
+  availableBalance: number;
+  reservedAmount: number;
+  lastTransactionAt: string | null;
   type: 'checking' | 'savings' | 'cash';
+  monthlyIncome?: number | null;
+  monthlyIncomeDay?: number | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 interface AccountContextType {

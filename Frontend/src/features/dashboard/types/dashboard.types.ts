@@ -1,5 +1,3 @@
-import { Transaction } from '../../transactions/types/transaction.types';
-
 export interface DashboardSummary {
   income: number;
   expense: number;

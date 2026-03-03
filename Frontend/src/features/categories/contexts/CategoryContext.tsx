@@ -7,9 +7,9 @@ export interface Category {
   name: string;
   color: string;
   icon: string;
-  type: 'income' | 'expense';
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 interface CategoryContextType {
