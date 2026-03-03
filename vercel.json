@@ -8,11 +8,11 @@
   "framework": "vite",
   "regions": ["iad1"],
   "env": {
-    "VITE_API_URL": "https://fintrack-backend.onrender.com/api/v1"
+    "VITE_API_URL": "https://fintrack-9iaq.onrender.com/api/v1"
   },
   "build": {
     "env": {
-      "VITE_API_URL": "https://fintrack-backend.onrender.com/api/v1"
+      "VITE_API_URL": "https://fintrack-9iaq.onrender.com/api/v1"
     }
   },
   "headers": [
