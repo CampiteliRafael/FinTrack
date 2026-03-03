@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -10,7 +11,7 @@ interface HeaderProps {
   isCollapsed: boolean;
 }
 
-export function Header({ onMenuClick, isCollapsed }: HeaderProps) {
+function HeaderComponent({ onMenuClick, isCollapsed }: HeaderProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -83,3 +84,5 @@ export function Header({ onMenuClick, isCollapsed }: HeaderProps) {
     </header>
   );
 }
+
+export const Header = memo(HeaderComponent);

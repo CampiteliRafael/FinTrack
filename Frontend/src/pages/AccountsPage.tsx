@@ -18,7 +18,8 @@ export default function AccountsPage() {
 
   useEffect(() => {
     fetchAccounts();
-  }, [fetchAccounts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleEdit(account: Account) {
     setEditingAccount(account);
@@ -53,8 +54,9 @@ export default function AccountsPage() {
     <div>
       {loading && accounts.length === 0 && <LoadingOverlay label="Carregando contas..." />}
 
-      <div className="flex justify-end mb-4 sm:mb-6">
-        <Button onClick={() => setIsModalOpen(true)}>Nova Conta</Button>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-bold">Contas</h2>
+        <Button onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto">Nova Conta</Button>
       </div>
 
       {accounts.length === 0 && !loading ? (
