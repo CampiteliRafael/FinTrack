@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import { HashUtil } from '../../shared/utils/hash.util';
+import { UnauthorizedError } from '../../shared/errors/AppError';
 
 const prisma = new PrismaClient();
 
@@ -67,15 +68,15 @@ export class PasswordResetService {
     });
 
     if (!resetToken) {
-      throw new Error('Invalid or expired reset token');
+      throw new UnauthorizedError('Invalid or expired reset token');
     }
 
     if (resetToken.used) {
-      throw new Error('Reset token already used');
+      throw new UnauthorizedError('Reset token already used');
     }
 
     if (resetToken.expiresAt < new Date()) {
-      throw new Error('Reset token expired');
+      throw new UnauthorizedError('Reset token expired');
     }
 
     // ✅ Usar HashUtil ao invés de bcrypt direto

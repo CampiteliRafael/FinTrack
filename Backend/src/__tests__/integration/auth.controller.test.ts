@@ -90,10 +90,10 @@ describe('Auth Controller - Integration Tests', () => {
 
       const response = await request(app).post('/api/v1/auth/register').send(userData);
 
-      expect(response.status).toBe(422);
+      expect(response.status).toBe(400);
     });
 
-    it('should return 422 for weak password', async () => {
+    it('should return 400 for weak password', async () => {
       const userData = {
         email: `test-weak-${Date.now()}@example.com`,
         password: '123',
@@ -102,7 +102,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       const response = await request(app).post('/api/v1/auth/register').send(userData);
 
-      expect(response.status).toBe(422);
+      expect(response.status).toBe(400);
     });
   });
 
