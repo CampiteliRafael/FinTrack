@@ -9,7 +9,6 @@ export class CategoryMapper {
       raw.name,
       raw.color,
       raw.icon,
-      raw.type,
       raw.createdAt,
       raw.updatedAt,
       raw.deletedAt
@@ -23,7 +22,6 @@ export class CategoryMapper {
       name: domain.name,
       color: domain.color,
       icon: domain.icon,
-      type: domain.type,
       createdAt: domain.createdAt,
       updatedAt: domain.updatedAt,
       deletedAt: domain.deletedAt,

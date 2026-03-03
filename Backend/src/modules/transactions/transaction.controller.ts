@@ -23,7 +23,7 @@ export class TransactionController {
   });
 
   getById = asyncHandler(async (req: Request, res: Response) => {
-    const transaction = await this.transactionService.getById(req.params.id, req.user!.userId);
+    const transaction = await this.transactionService.getById(String(req.params.id), req.user!.userId);
     res.json(transaction);
   });
 
@@ -34,7 +34,7 @@ export class TransactionController {
 
   update = asyncHandler(async (req: Request, res: Response) => {
     const transaction = await this.transactionService.update(
-      req.params.id,
+      String(req.params.id),
       req.user!.userId,
       req.body
     );
@@ -42,7 +42,7 @@ export class TransactionController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
-    await this.transactionService.delete(req.params.id, req.user!.userId);
+    await this.transactionService.delete(String(req.params.id), req.user!.userId);
     res.status(204).send();
   });
 }

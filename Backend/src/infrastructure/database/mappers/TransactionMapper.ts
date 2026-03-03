@@ -1,4 +1,5 @@
 import { Transaction as PrismaTransaction } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { Transaction } from '../../../core/entities/Transaction';
 
 export class TransactionMapper {
@@ -25,8 +26,8 @@ export class TransactionMapper {
       accountId: domain.accountId,
       categoryId: domain.categoryId,
       type: domain.type,
-      amount: domain.amount,
-      description: domain.description,
+      amount: new Decimal(domain.amount),
+      description: domain.description || null,
       date: domain.date,
       createdAt: domain.createdAt,
       updatedAt: domain.updatedAt,

@@ -32,7 +32,6 @@ export class CategoryRepositoryImpl implements ICategoryRepository {
         name: category.name,
         color: category.color,
         icon: category.icon,
-        type: category.type,
       },
     });
 
@@ -46,7 +45,6 @@ export class CategoryRepositoryImpl implements ICategoryRepository {
         ...(data.name && { name: data.name }),
         ...(data.color && { color: data.color }),
         ...(data.icon && { icon: data.icon }),
-        ...(data.type && { type: data.type }),
       },
     });
 

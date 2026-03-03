@@ -97,7 +97,7 @@ async function deleteOldTransactions() {
 
   const inactiveUsers = await prisma.user.findMany({
     where: {
-      lastLoginAt: {
+      updatedAt: {
         lt: sixMonthsAgo,
       },
     },

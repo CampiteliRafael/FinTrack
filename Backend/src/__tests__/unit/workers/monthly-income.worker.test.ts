@@ -140,7 +140,7 @@ describe('Monthly Income Worker Logic', () => {
           await prisma.accountEvent.create({
             data: {
               accountId: account.id,
-              type: 'INCOME',
+              type: 'transaction_income',
               amount: account.monthlyIncome!,
               transactionId: transaction.id,
               description: 'Receita mensal automática',

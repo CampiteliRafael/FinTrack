@@ -1,5 +1,3 @@
-import { TransactionType } from '@prisma/client';
-
 export class Category {
   constructor(
     public readonly id: string,
@@ -7,7 +5,6 @@ export class Category {
     public readonly name: string,
     public readonly color: string,
     public readonly icon: string,
-    public readonly type: TransactionType,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
     public readonly deletedAt: Date | null
@@ -35,13 +32,5 @@ export class Category {
 
   isDeleted(): boolean {
     return this.deletedAt !== null;
-  }
-
-  isForIncome(): boolean {
-    return this.type === 'income';
-  }
-
-  isForExpense(): boolean {
-    return this.type === 'expense';
   }
 }

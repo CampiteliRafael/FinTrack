@@ -1,4 +1,5 @@
 import { Account as PrismaAccount } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { Account } from '../../../core/entities/Account';
 
 export class AccountMapper {
@@ -20,7 +21,13 @@ export class AccountMapper {
       id: domain.id,
       userId: domain.userId,
       name: domain.name,
-      initialBalance: domain.initialBalance,
+      initialBalance: new Decimal(domain.initialBalance),
+      currentBalance: new Decimal(domain.initialBalance),
+      availableBalance: new Decimal(domain.initialBalance),
+      reservedAmount: new Decimal(0),
+      monthlyIncome: null,
+      monthlyIncomeDay: null,
+      lastTransactionAt: null,
       type: domain.type,
       createdAt: domain.createdAt,
       updatedAt: domain.updatedAt,

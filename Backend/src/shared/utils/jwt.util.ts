@@ -9,10 +9,9 @@ export interface JwtPayload {
 
 export class JwtUtil {
   static signAccessToken(payload: JwtPayload): string {
-    const options: SignOptions = {
+    return jwt.sign(payload, jwtConfig.secret, {
       expiresIn: jwtConfig.accessTokenExpiresIn,
-    };
-    return jwt.sign(payload, jwtConfig.secret, options);
+    } as SignOptions);
   }
 
   static generateRefreshToken(): string {

@@ -5,7 +5,7 @@ import { z } from 'zod';
  */
 export const uuidParamSchema = z.object({
   id: z
-    .string({ required_error: 'ID é obrigatório' })
+    .string({ message: 'ID é obrigatório' })
     .uuid('ID deve ser um UUID válido'),
 });
 
@@ -51,9 +51,7 @@ export const dateRangeSchema = z.object({
  * Schema para validação de tipo de transação
  */
 export const transactionTypeSchema = z.object({
-  type: z.enum(['income', 'expense'], {
-    errorMap: () => ({ message: "Tipo deve ser 'income' ou 'expense'" }),
-  }).optional(),
+  type: z.enum(['income', 'expense']).optional(),
 });
 
 /**
@@ -71,16 +69,12 @@ export const transactionFiltersSchema = paginationSchema
  * Schema para validação de filtros de metas
  */
 export const goalFiltersSchema = paginationSchema.extend({
-  status: z.enum(['active', 'completed', 'cancelled'], {
-    errorMap: () => ({ message: "Status deve ser 'active', 'completed' ou 'cancelled'" }),
-  }).optional(),
+  status: z.enum(['active', 'completed', 'cancelled']).optional(),
 });
 
 /**
  * Schema para validação de filtros de parcelamentos
  */
 export const installmentFiltersSchema = paginationSchema.extend({
-  status: z.enum(['pending', 'paid', 'overdue'], {
-    errorMap: () => ({ message: "Status deve ser 'pending', 'paid' ou 'overdue'" }),
-  }).optional(),
+  status: z.enum(['pending', 'paid', 'overdue']).optional(),
 });

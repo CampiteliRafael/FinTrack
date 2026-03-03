@@ -37,7 +37,7 @@ export class NotificationController {
     const { id } = req.params;
     const userId = req.user!.userId;
 
-    const notification = await notificationService.markAsRead(id, userId);
+    const notification = await notificationService.markAsRead(String(id), userId);
 
     if (!notification) {
       throw new NotFoundError('Notificação');
@@ -66,7 +66,7 @@ export class NotificationController {
     const { id } = req.params;
     const userId = req.user!.userId;
 
-    const deleted = await notificationService.delete(id, userId);
+    const deleted = await notificationService.delete(String(id), userId);
 
     if (!deleted) {
       throw new NotFoundError('Notificação');

@@ -37,7 +37,7 @@ export function validatePassword(password: string): {
 
   return {
     isValid: false,
-    errors: result.error.errors.map((err) => err.message),
+    errors: result.error.issues.map((err) => err.message),
   };
 }
 
