@@ -1,0 +1,98 @@
+import { TransactionRepository } from '../transactions/transaction.repository';
+import { AccountRepository } from '../accounts/account.repository';
+import { CacheService } from '../../shared/cache/cache.service';
+
+export class DashboardServiceOptimized {
+  private cacheService: CacheService;
+
+  constructor(
+    private transactionRepository: TransactionRepository,
+    private accountRepository: AccountRepository
+  ) {
+    this.cacheService = new CacheService();
+  }
+
+  async getSummary(userId: string) {
+    const cacheKey = `dashboard:summary:${userId}`;
+
+    return this.cacheService.remember(cacheKey, 300, async () => {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const [accounts, transactions] = await Promise.all([
+        this.accountRepository.findAll(userId),
+        this.transactionRepository.findAll(userId, {
+          startDate: startOfMonth,
+          endDate: endOfMonth,
+        }),
+      ]);
+
+      const totalBalance = accounts.reduce((sum, acc) => {
+        const accBalance = acc.initialBalance.toNumber();
+        const accTransactions = transactions.transactions.filter((t) => t.accountId === acc.id);
+        const transactionSum = accTransactions.reduce((tSum, t) => {
+          const amount = t.amount.toNumber();
+          return t.type === 'income' ? tSum + amount : tSum - amount;
+        }, 0);
+        return sum + accBalance + transactionSum;
+      }, 0);
+
+      const monthlyIncome = transactions.transactions
+        .filter((t) => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount.toNumber(), 0);
+
+      const monthlyExpenses = transactions.transactions
+        .filter((t) => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount.toNumber(), 0);
+
+      const categoryBreakdown = transactions.transactions
+        .filter((t) => t.type === 'expense')
+        .reduce(
+          (acc, t) => {
+            const existing = acc.find((item) => item.categoryId === t.categoryId);
+            const amount = t.amount.toNumber();
+
+            if (existing) {
+              existing.amount += amount;
+              existing.count += 1;
+            } else {
+              acc.push({
+                categoryId: t.categoryId,
+                categoryName: t.category?.name || 'Unknown',
+                categoryColor: t.category?.color || '#6B7280',
+                amount,
+                count: 1,
+              });
+            }
+            return acc;
+          },
+          [] as Array<{
+            categoryId: string;
+            categoryName: string;
+            categoryColor: string;
+            amount: number;
+            count: number;
+          }>
+        )
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
+
+      return {
+        totalBalance,
+        monthlyIncome,
+        monthlyExpenses,
+        monthlyBalance: monthlyIncome - monthlyExpenses,
+        categoryBreakdown,
+        period: {
+          start: startOfMonth,
+          end: endOfMonth,
+        },
+      };
+    });
+  }
+
+  async invalidateSummaryCache(userId: string) {
+    await this.cacheService.del(`dashboard:summary:${userId}`);
+  }
+}

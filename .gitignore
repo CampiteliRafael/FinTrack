@@ -1,0 +1,71 @@
+# Dependencies (global ignore)
+node_modules/
+**/node_modules/
+/docs
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.free
+**/.env
+**/.env.local
+**/.env.production
+**/.env.free
+
+# Testing
+coverage/
+**/coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+.temp/
+tmp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma
+**/prisma/.env
+
+# Package manager
+.pnp
+.pnp.js
+.yarn/
+.pnpm-debug.log
+
+# Production
+/production

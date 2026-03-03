@@ -1,0 +1,1177 @@
+openapi: 3.0.0
+info:
+  title: FinTrack API
+  version: 1.0.0
+  description: |
+    API de Gerenciamento Financeiro Pessoal
+
+    O FinTrack permite gerenciar suas finanças pessoais através de:
+    - Contas bancárias e carteiras
+    - Transações (receitas e despesas)
+    - Categorização de gastos
+    - Metas financeiras
+    - Parcelamentos
+
+  contact:
+    name: FinTrack Support
+    email: support@fintrack.com
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: https://api.fintrack.com/api/v1
+    description: Production server
+
+tags:
+  - name: Auth
+    description: Autenticação e autorização
+  - name: Accounts
+    description: Gerenciamento de contas bancárias e carteiras
+  - name: Transactions
+    description: Transações financeiras (receitas e despesas)
+  - name: Categories
+    description: Categorias de transações
+  - name: Goals
+    description: Metas financeiras
+  - name: Installments
+    description: Parcelamentos e compras a prazo
+  - name: Dashboard
+    description: Resumos e estatísticas financeiras
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtido no endpoint de login
+
+  schemas:
+    # Auth
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          example: "joao@example.com"
+        password:
+          type: string
+          minLength: 6
+          example: "senha123"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "joao@example.com"
+        password:
+          type: string
+          example: "senha123"
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/User'
+
+    # User
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          example: "joao@example.com"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Account
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Banco Itaú"
+        type:
+          type: string
+          enum: [checking, savings, investment, cash, credit_card]
+          example: "checking"
+        balance:
+          type: number
+          format: decimal
+          example: 1500.50
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          example: "#3B82F6"
+        icon:
+          type: string
+          example: "bank"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAccountRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          type: string
+          enum: [checking, savings, investment, cash, credit_card]
+        balance:
+          type: number
+          format: decimal
+          default: 0
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+        icon:
+          type: string
+
+    # Category
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Alimentação"
+        type:
+          type: string
+          enum: [income, expense]
+          example: "expense"
+        color:
+          type: string
+          example: "#10B981"
+        icon:
+          type: string
+          example: "utensils"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateCategoryRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        type:
+          type: string
+          enum: [income, expense]
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+        icon:
+          type: string
+
+    # Transaction
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [income, expense]
+          example: "expense"
+        amount:
+          type: number
+          format: decimal
+          example: 150.50
+        description:
+          type: string
+          maxLength: 500
+          example: "Compra no supermercado"
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+        account:
+          $ref: '#/components/schemas/Account'
+        category:
+          $ref: '#/components/schemas/Category'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTransactionRequest:
+      type: object
+      required:
+        - type
+        - amount
+        - accountId
+        - categoryId
+        - date
+      properties:
+        type:
+          type: string
+          enum: [income, expense]
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+        description:
+          type: string
+          maxLength: 500
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+
+    # Goal
+    Goal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Viagem para Europa"
+        targetAmount:
+          type: number
+          format: decimal
+          example: 10000.00
+        currentAmount:
+          type: number
+          format: decimal
+          example: 2500.00
+        deadline:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+          example: "active"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateGoalRequest:
+      type: object
+      required:
+        - name
+        - targetAmount
+        - deadline
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        targetAmount:
+          type: number
+          format: decimal
+          minimum: 0.01
+        currentAmount:
+          type: number
+          format: decimal
+          default: 0
+        deadline:
+          type: string
+          format: date
+
+    # Installment
+    Installment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        description:
+          type: string
+          example: "Notebook Dell"
+        totalAmount:
+          type: number
+          format: decimal
+          example: 3000.00
+        installmentCount:
+          type: integer
+          example: 10
+        paidInstallments:
+          type: integer
+          example: 3
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        account:
+          $ref: '#/components/schemas/Account'
+        category:
+          $ref: '#/components/schemas/Category'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateInstallmentRequest:
+      type: object
+      required:
+        - description
+        - totalAmount
+        - installmentCount
+        - accountId
+        - categoryId
+        - startDate
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        totalAmount:
+          type: number
+          format: decimal
+          minimum: 0.01
+        installmentCount:
+          type: integer
+          minimum: 2
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+
+    # Dashboard
+    DashboardSummary:
+      type: object
+      properties:
+        totalIncome:
+          type: number
+          format: decimal
+        totalExpense:
+          type: number
+          format: decimal
+        balance:
+          type: number
+          format: decimal
+        accountsCount:
+          type: integer
+        transactionsCount:
+          type: integer
+
+    CategoryStats:
+      type: object
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        categoryName:
+          type: string
+        categoryColor:
+          type: string
+        amount:
+          type: number
+          format: decimal
+        percentage:
+          type: number
+          format: decimal
+
+    # Error responses
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Erro ao processar requisição"
+        error:
+          type: string
+          example: "Detalhes do erro"
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Erro de validação"
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Auth endpoints
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Registrar novo usuário
+      description: Cria uma nova conta de usuário no sistema
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: Email já cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Fazer login
+      description: Autentica um usuário e retorna um token JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login realizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Credenciais inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Accounts endpoints
+  /accounts:
+    get:
+      tags:
+        - Accounts
+      summary: Listar contas
+      description: Retorna todas as contas do usuário autenticado
+      responses:
+        '200':
+          description: Lista de contas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Accounts
+      summary: Criar conta
+      description: Cria uma nova conta (banco, carteira, etc)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Conta criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /accounts/{id}:
+    get:
+      tags:
+        - Accounts
+      summary: Buscar conta por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conta encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          description: Conta não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Accounts
+      summary: Atualizar conta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '200':
+          description: Conta atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          description: Conta não encontrada
+
+    delete:
+      tags:
+        - Accounts
+      summary: Deletar conta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Conta deletada com sucesso
+        '404':
+          description: Conta não encontrada
+
+  # Transactions endpoints
+  /transactions:
+    get:
+      tags:
+        - Transactions
+      summary: Listar transações
+      description: Retorna transações com filtros opcionais
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [income, expense]
+          description: Filtrar por tipo
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filtrar por conta
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filtrar por categoria
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Data inicial (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Data final (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Lista de transações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+
+    post:
+      tags:
+        - Transactions
+      summary: Criar transação
+      description: Cria uma nova transação (receita ou despesa)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+      responses:
+        '201':
+          description: Transação criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Dados inválidos
+
+  /transactions/{id}:
+    get:
+      tags:
+        - Transactions
+      summary: Buscar transação por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transação encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Transação não encontrada
+
+    put:
+      tags:
+        - Transactions
+      summary: Atualizar transação
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+      responses:
+        '200':
+          description: Transação atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+    delete:
+      tags:
+        - Transactions
+      summary: Deletar transação
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Transação deletada com sucesso
+
+  # Categories endpoints
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: Listar categorias
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+
+    post:
+      tags:
+        - Categories
+      summary: Criar categoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Categoria criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+
+  /categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Buscar categoria por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Categoria encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+
+    put:
+      tags:
+        - Categories
+      summary: Atualizar categoria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '200':
+          description: Categoria atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+
+    delete:
+      tags:
+        - Categories
+      summary: Deletar categoria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Categoria deletada com sucesso
+
+  # Goals endpoints
+  /goals:
+    get:
+      tags:
+        - Goals
+      summary: Listar metas
+      responses:
+        '200':
+          description: Lista de metas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  goals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Goal'
+
+    post:
+      tags:
+        - Goals
+      summary: Criar meta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalRequest'
+      responses:
+        '201':
+          description: Meta criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+
+  /goals/{id}:
+    get:
+      tags:
+        - Goals
+      summary: Buscar meta por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Meta encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+
+    put:
+      tags:
+        - Goals
+      summary: Atualizar meta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalRequest'
+      responses:
+        '200':
+          description: Meta atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+
+    delete:
+      tags:
+        - Goals
+      summary: Deletar meta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Meta deletada com sucesso
+
+  /goals/{id}/deposit:
+    post:
+      tags:
+        - Goals
+      summary: Adicionar valor à meta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+              properties:
+                amount:
+                  type: number
+                  format: decimal
+                  minimum: 0.01
+      responses:
+        '200':
+          description: Valor adicionado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+
+  # Installments endpoints
+  /installments:
+    get:
+      tags:
+        - Installments
+      summary: Listar parcelamentos
+      responses:
+        '200':
+          description: Lista de parcelamentos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Installment'
+
+    post:
+      tags:
+        - Installments
+      summary: Criar parcelamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstallmentRequest'
+      responses:
+        '201':
+          description: Parcelamento criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Installment'
+
+  /installments/{id}:
+    get:
+      tags:
+        - Installments
+      summary: Buscar parcelamento por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Parcelamento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Installment'
+
+    delete:
+      tags:
+        - Installments
+      summary: Deletar parcelamento
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Parcelamento deletado com sucesso
+
+  /installments/{id}/pay:
+    post:
+      tags:
+        - Installments
+      summary: Marcar parcela como paga
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Parcela marcada como paga
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Installment'
+
+  # Dashboard endpoints
+  /dashboard/summary:
+    get:
+      tags:
+        - Dashboard
+      summary: Obter resumo financeiro
+      responses:
+        '200':
+          description: Resumo financeiro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+
+  /dashboard/by-category:
+    get:
+      tags:
+        - Dashboard
+      summary: Obter estatísticas por categoria
+      responses:
+        '200':
+          description: Estatísticas por categoria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryStats'
+
+  /dashboard/recent:
+    get:
+      tags:
+        - Dashboard
+      summary: Obter transações recentes
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Transações recentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'

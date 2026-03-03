@@ -1,0 +1,86 @@
+/* FinTrack Design System - Theme Variables */
+
+:root {
+  /* Light Mode Colors */
+
+  /* Background Colors */
+  --bg-primary: 255 255 255;        /* #FFFFFF - Main background */
+  --bg-secondary: 249 250 251;      /* #F9FAFB - Cards, panels (gray-50) */
+  --bg-tertiary: 243 244 246;       /* #F3F4F6 - Hover states (gray-100) */
+
+  /* Foreground (Text) Colors */
+  --text-primary: 24 24 27;         /* #18181B - Main text (zinc-900) */
+  --text-secondary: 82 82 91;       /* #52525B - Secondary text (zinc-600) */
+  --text-tertiary: 161 161 170;     /* #A1A1AA - Muted text (zinc-400) */
+
+  /* Border Colors */
+  --border-primary: 228 228 231;    /* #E4E4E7 - Main borders (zinc-200) */
+  --border-secondary: 244 244 245;  /* #F4F4F5 - Subtle borders (zinc-100) */
+
+  /* Accent Colors */
+  --accent-primary: 59 130 246;     /* #3B82F6 - Blue primary (blue-500) */
+  --accent-primary-hover: 37 99 235;/* #2563EB - Blue hover (blue-600) */
+  --accent-success: 16 185 129;     /* #10B981 - Green success (emerald-500) */
+  --accent-warning: 245 158 11;     /* #F59E0B - Amber warning (amber-500) */
+  --accent-danger: 239 68 68;       /* #EF4444 - Red danger/error (red-500) */
+  --accent-income: 16 185 129;      /* #10B981 - Green for income */
+  --accent-expense: 239 68 68;      /* #EF4444 - Red for expense */
+
+  /* Shadow Colors */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Layout Spacing */
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+  --header-height: 64px;
+}
+
+.dark {
+  /* Dark Mode Colors */
+
+  /* Background Colors */
+  --bg-primary: 24 24 27;           /* #18181B - Main background (zinc-900) */
+  --bg-secondary: 39 39 42;         /* #27272A - Cards, panels (zinc-800) */
+  --bg-tertiary: 63 63 70;          /* #3F3F46 - Hover states (zinc-700) */
+
+  /* Foreground (Text) Colors */
+  --text-primary: 250 250 250;      /* #FAFAFA - Main text (zinc-50) */
+  --text-secondary: 161 161 170;    /* #A1A1AA - Secondary text (zinc-400) */
+  --text-tertiary: 113 113 122;     /* #71717A - Muted text (zinc-500) */
+
+  /* Border Colors */
+  --border-primary: 63 63 70;       /* #3F3F46 - Main borders (zinc-700) */
+  --border-secondary: 39 39 42;     /* #27272A - Subtle borders (zinc-800) */
+
+  /* Accent Colors (Brighter for dark mode) */
+  --accent-primary: 96 165 250;     /* #60A5FA - Blue primary (blue-400) */
+  --accent-primary-hover: 59 130 246; /* #3B82F6 - Blue hover (blue-500) */
+  --accent-success: 52 211 153;     /* #34D399 - Green success (emerald-400) */
+  --accent-warning: 251 191 36;     /* #FBBF24 - Amber warning (amber-400) */
+  --accent-danger: 248 113 113;     /* #F87171 - Red danger/error (red-400) */
+  --accent-income: 52 211 153;      /* #34D399 - Green for income */
+  --accent-expense: 248 113 113;    /* #F87171 - Red for expense */
+
+  /* Shadow Colors (Lighter for dark mode) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+}
+
+/* Smooth theme transition */
+* {
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* Prevent transition on page load */
+.preload * {
+  transition: none !important;
+}
+
+/* Base body styling */
+body {
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
+}

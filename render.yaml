@@ -1,0 +1,77 @@
+# ============================================
+# RENDER.COM - BLUEPRINT (Infrastructure as Code)
+# ============================================
+# Este arquivo permite deploy automático no Render
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ============================================
+  # Backend API
+  # ============================================
+  - type: web
+    name: fintrack-backend
+    env: node
+    region: ohio # US East (mais barato e próximo do Neon)
+    plan: free # Free tier (750h/mês)
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: FREE_HOSTING
+        value: true
+      - key: ENABLE_WORKERS
+        value: false
+      - key: DATABASE_URL
+        sync: false # Secret - configurar manualmente no dashboard
+      - key: JWT_SECRET
+        generateValue: true # Gera automaticamente
+      - key: FRONTEND_URL
+        value: https://fintrack.vercel.app
+      - key: REDIS_HOST
+        sync: false # Configurar manualmente
+      - key: REDIS_PORT
+        value: 6379
+      - key: REDIS_PASSWORD
+        sync: false # Secret - configurar manualmente
+
+# ============================================
+# DATABASES (Usar externos para free tier)
+# ============================================
+# Neon PostgreSQL: https://neon.tech (3 GB grátis)
+# Upstash Redis: https://upstash.com (10K cmds/dia grátis)
+#
+# Nota: Render oferece PostgreSQL e Redis pagos
+# Para free tier, use serviços externos acima
+
+# ============================================
+# COMO USAR
+# ============================================
+#
+# 1. Via Dashboard (Recomendado):
+#    - Conectar repositório GitHub
+#    - Render detecta render.yaml automaticamente
+#    - Configurar secrets manualmente (DATABASE_URL, REDIS_*)
+#
+# 2. Via Render CLI:
+#    render blueprints init
+#    render blueprints deploy
+#
+# 3. Auto-deploy:
+#    - Push para branch main = deploy automático
+#    - Pull Requests = preview deploys (Pro plan)
+#
+# ============================================
+# CONFIGURAR SECRETS MANUALMENTE
+# ============================================
+#
+# No Dashboard Render → fintrack-backend → Environment:
+#
+# DATABASE_URL=postgresql://USER:PASS@HOST.neon.tech/DB?sslmode=require
+# REDIS_HOST=your-endpoint.upstash.io
+# REDIS_PASSWORD=your_upstash_token
+#
+# JWT_SECRET é gerado automaticamente (generateValue: true)

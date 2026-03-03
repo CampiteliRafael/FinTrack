@@ -800,44 +800,709 @@ transacao.subscribe(new LoggerTransacao());
 transacao.criar({ valor: 100 });  // Notifica ambos
 ```
 
-### 5. Dependency Injection
+### 5. Dependency Injection (DI)
 
-```javascript
-// ✅ DI: Injetar dependências em vez de criá-las internamente
+#### O QUE É DEPENDENCY INJECTION?
 
-// Sem DI (acoplado)
-class TransacaoService {
+Dependency Injection é um padrão onde **dependências são fornecidas (injetadas) a uma classe externamente**, em vez de serem criadas internamente pela própria classe.
+
+**Por que usar DI no FinTrack?**
+- ✅ **Testabilidade**: Fácil mockar dependências em testes
+- ✅ **Flexibilidade**: Trocar implementações sem alterar código
+- ✅ **Manutenibilidade**: Menos acoplamento entre classes
+- ✅ **Reutilização**: Mesma classe com diferentes dependências
+
+```
+┌────────────────────────────────────────────────┐
+│  SEM DI: Classe cria suas dependências         │
+│  ❌ Alto acoplamento                            │
+│  ❌ Difícil testar                              │
+│  ❌ Difícil trocar implementação                │
+└────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────┐
+│  COM DI: Dependências são injetadas            │
+│  ✅ Baixo acoplamento                           │
+│  ✅ Fácil testar (mock dependencies)           │
+│  ✅ Fácil trocar implementação                  │
+└────────────────────────────────────────────────┘
+```
+
+---
+
+#### PROBLEMA SEM DI
+
+```typescript
+// ❌ SEM DI: TransactionService cria suas próprias dependências
+
+class TransactionService {
+  private repository: TransactionRepository;
+  private emailService: EmailService;
+  private logger: Logger;
+
   constructor() {
-    this.repository = new TransacaoRepository();
-    this.email = new EmailService();
+    // ❌ Classe instancia suas dependências internamente
+    this.repository = new TransactionRepository();
+    this.emailService = new EmailService();
+    this.logger = new Logger();
+  }
+
+  async createTransaction(data: CreateTransactionDTO) {
+    this.logger.log('Creating transaction');
+
+    const transaction = await this.repository.create(data);
+
+    await this.emailService.send({
+      to: data.userEmail,
+      subject: 'New transaction created',
+      body: `Transaction ${transaction.id} was created`
+    });
+
+    return transaction;
   }
 }
 
-// Com DI (desacoplado)
-class TransacaoService {
-  constructor(repository, email) {
-    this.repository = repository;
-    this.email = email;
-  }
+// ❌ PROBLEMAS:
+// 1. Impossível testar sem enviar emails reais
+// 2. Impossível trocar repository (ex: usar mock, Redis, etc)
+// 3. Logger sempre escreve em console (não pode trocar para arquivo)
+// 4. Acoplamento alto - mudanças nas dependências afetam TransactionService
+```
 
-  async criar(dados) {
-    const transacao = await this.repository.criar(dados);
-    await this.email.notificar(transacao);
-    return transacao;
+---
+
+#### SOLUÇÃO COM DI
+
+```typescript
+// ✅ COM DI: Dependências são injetadas
+
+// 1. Definir interfaces (abstrações)
+interface ITransactionRepository {
+  create(data: CreateTransactionDTO): Promise<Transaction>;
+  findById(id: string): Promise<Transaction | null>;
+}
+
+interface IEmailService {
+  send(params: EmailParams): Promise<void>;
+}
+
+interface ILogger {
+  log(message: string): void;
+  error(message: string, error: Error): void;
+}
+
+// 2. Service recebe dependências no construtor
+class TransactionService {
+  constructor(
+    private repository: ITransactionRepository,  // ✅ Injetado
+    private emailService: IEmailService,         // ✅ Injetado
+    private logger: ILogger                      // ✅ Injetado
+  ) {}
+
+  async createTransaction(data: CreateTransactionDTO) {
+    this.logger.log('Creating transaction');
+
+    const transaction = await this.repository.create(data);
+
+    await this.emailService.send({
+      to: data.userEmail,
+      subject: 'New transaction created',
+      body: `Transaction ${transaction.id} was created`
+    });
+
+    return transaction;
   }
 }
 
-// Composição em um só lugar
-class ApplicationFactory {
-  static criarTransacaoService() {
-    const repository = new TransacaoRepository();
-    const email = new EmailService();
-    return new TransacaoService(repository, email);
+// 3. Criar implementações concretas
+class PrismaTransactionRepository implements ITransactionRepository {
+  constructor(private prisma: PrismaClient) {}
+
+  async create(data: CreateTransactionDTO): Promise<Transaction> {
+    return this.prisma.transaction.create({ data });
+  }
+
+  async findById(id: string): Promise<Transaction | null> {
+    return this.prisma.transaction.findUnique({ where: { id } });
   }
 }
 
-// Uso
-const service = ApplicationFactory.criarTransacaoService();
+class SendGridEmailService implements IEmailService {
+  async send(params: EmailParams): Promise<void> {
+    // Implementação com SendGrid
+  }
+}
+
+class WinstonLogger implements ILogger {
+  log(message: string): void {
+    console.log(`[LOG] ${message}`);
+  }
+
+  error(message: string, error: Error): void {
+    console.error(`[ERROR] ${message}`, error);
+  }
+}
+
+// 4. Compor e injetar dependências (manualmente)
+const prisma = new PrismaClient();
+const repository = new PrismaTransactionRepository(prisma);
+const emailService = new SendGridEmailService();
+const logger = new WinstonLogger();
+
+const transactionService = new TransactionService(
+  repository,
+  emailService,
+  logger
+);
+
+// ✅ VANTAGENS:
+// 1. Fácil testar com mocks
+// 2. Fácil trocar implementações
+// 3. Baixo acoplamento
+```
+
+---
+
+#### OS 3 TIPOS DE INJEÇÃO
+
+**1. Constructor Injection (Recomendado)**
+
+```typescript
+// ✅ MELHOR: Injeção via construtor
+
+class TransactionService {
+  constructor(
+    private readonly repository: ITransactionRepository,
+    private readonly emailService: IEmailService
+  ) {
+    // Dependências obrigatórias garantidas no construtor
+  }
+
+  async create(data: CreateTransactionDTO) {
+    return this.repository.create(data);
+  }
+}
+
+// ✅ Vantagens:
+// - Dependências obrigatórias (não pode criar sem elas)
+// - Imutáveis (readonly)
+// - Explícitas (visíveis na assinatura)
+```
+
+**2. Property Injection**
+
+```typescript
+// ❌ MENOS RECOMENDADO: Injeção via propriedade
+
+class TransactionService {
+  repository!: ITransactionRepository;  // ! indica que será injetado
+  emailService!: IEmailService;
+
+  async create(data: CreateTransactionDTO) {
+    return this.repository.create(data);
+  }
+}
+
+const service = new TransactionService();
+service.repository = new PrismaTransactionRepository(prisma);
+service.emailService = new SendGridEmailService();
+
+// ❌ Problemas:
+// - Dependências não são obrigatórias (pode esquecer de injetar)
+// - Pode causar erros em runtime
+// - Menos explícito
+```
+
+**3. Method Injection**
+
+```typescript
+// ⚠️ USO ESPECÍFICO: Injeção via método
+
+class TransactionService {
+  async create(
+    data: CreateTransactionDTO,
+    repository: ITransactionRepository  // ✅ Injetado no método
+  ) {
+    return repository.create(data);
+  }
+}
+
+// ⚠️ Útil quando:
+// - Dependência varia por chamada
+// - Dependência é opcional
+// - Queremos override pontual
+```
+
+---
+
+#### DI CONTAINER (Automático)
+
+Criar manualmente todas as dependências é trabalhoso. **DI Containers** automatizam isso.
+
+**Bibliotecas populares:**
+- `tsyringe` - Microsoft (TypeScript)
+- `InversifyJS` - Popular
+- `awilix` - Node.js focado
+- `typedi` - TypeScript decorators
+
+**Exemplo com TSyringe:**
+
+```typescript
+// 1. Instalar
+// npm install tsyringe reflect-metadata
+
+// 2. Importar reflect-metadata no entry point
+import 'reflect-metadata';
+
+// 3. Decorators para registrar classes
+import { injectable, inject, container } from 'tsyringe';
+
+// Interfaces
+interface ITransactionRepository {
+  create(data: CreateTransactionDTO): Promise<Transaction>;
+}
+
+interface IEmailService {
+  send(params: EmailParams): Promise<void>;
+}
+
+// Implementações com @injectable
+@injectable()
+class PrismaTransactionRepository implements ITransactionRepository {
+  constructor(@inject('PrismaClient') private prisma: PrismaClient) {}
+
+  async create(data: CreateTransactionDTO): Promise<Transaction> {
+    return this.prisma.transaction.create({ data });
+  }
+}
+
+@injectable()
+class SendGridEmailService implements IEmailService {
+  async send(params: EmailParams): Promise<void> {
+    // Implementação SendGrid
+  }
+}
+
+// Service com @injectable
+@injectable()
+class TransactionService {
+  constructor(
+    @inject('ITransactionRepository') private repository: ITransactionRepository,
+    @inject('IEmailService') private emailService: IEmailService
+  ) {}
+
+  async create(data: CreateTransactionDTO) {
+    const transaction = await this.repository.create(data);
+    await this.emailService.send({
+      to: data.userEmail,
+      subject: 'Transaction created'
+    });
+    return transaction;
+  }
+}
+
+// 4. Registrar dependências no container
+container.register('PrismaClient', {
+  useValue: new PrismaClient()
+});
+
+container.register('ITransactionRepository', {
+  useClass: PrismaTransactionRepository
+});
+
+container.register('IEmailService', {
+  useClass: SendGridEmailService
+});
+
+// 5. Resolver automaticamente!
+const transactionService = container.resolve(TransactionService);
+// ✅ Container resolve todas dependências automaticamente!
+```
+
+---
+
+#### DI NO FINTRACK - IMPLEMENTAÇÃO COMPLETA
+
+**Estrutura de pastas:**
+
+```
+src/
+├── domain/
+│   ├── entities/
+│   │   └── Transaction.ts
+│   ├── repositories/  (interfaces)
+│   │   └── ITransactionRepository.ts
+│   └── services/  (interfaces)
+│       └── IEmailService.ts
+├── infrastructure/
+│   ├── repositories/  (implementações)
+│   │   └── PrismaTransactionRepository.ts
+│   └── services/
+│       └── SendGridEmailService.ts
+├── application/
+│   └── services/
+│       └── TransactionService.ts
+└── di/
+    └── container.ts  (configuração do DI)
+```
+
+**1. Definir Interfaces (Domínio)**
+
+```typescript
+// src/domain/repositories/ITransactionRepository.ts
+
+export interface ITransactionRepository {
+  findById(id: string): Promise<Transaction | null>;
+  findByUserId(userId: string): Promise<Transaction[]>;
+  create(data: CreateTransactionDTO): Promise<Transaction>;
+  update(id: string, data: UpdateTransactionDTO): Promise<Transaction>;
+  delete(id: string): Promise<void>;
+}
+```
+
+```typescript
+// src/domain/services/IEmailService.ts
+
+export interface IEmailService {
+  sendTransactionCreated(transaction: Transaction, userEmail: string): Promise<void>;
+  sendBudgetAlert(userId: string, category: string): Promise<void>;
+}
+```
+
+**2. Implementações (Infraestrutura)**
+
+```typescript
+// src/infrastructure/repositories/PrismaTransactionRepository.ts
+
+import { injectable, inject } from 'tsyringe';
+
+@injectable()
+export class PrismaTransactionRepository implements ITransactionRepository {
+  constructor(
+    @inject('PrismaClient') private prisma: PrismaClient
+  ) {}
+
+  async findById(id: string): Promise<Transaction | null> {
+    const data = await this.prisma.transaction.findUnique({
+      where: { id }
+    });
+    return data ? this.toDomain(data) : null;
+  }
+
+  async findByUserId(userId: string): Promise<Transaction[]> {
+    const data = await this.prisma.transaction.findMany({
+      where: { userId, deletedAt: null }
+    });
+    return data.map(this.toDomain);
+  }
+
+  async create(data: CreateTransactionDTO): Promise<Transaction> {
+    const transaction = await this.prisma.transaction.create({
+      data: this.toPersistence(data)
+    });
+    return this.toDomain(transaction);
+  }
+
+  // Métodos de conversão
+  private toDomain(data: any): Transaction {
+    return new Transaction(
+      data.id,
+      data.amount,
+      data.description,
+      data.type,
+      data.userId
+    );
+  }
+
+  private toPersistence(transaction: any): any {
+    return {
+      amount: transaction.amount,
+      description: transaction.description,
+      type: transaction.type,
+      userId: transaction.userId
+    };
+  }
+}
+```
+
+```typescript
+// src/infrastructure/services/SendGridEmailService.ts
+
+import { injectable } from 'tsyringe';
+import sgMail from '@sendgrid/mail';
+
+@injectable()
+export class SendGridEmailService implements IEmailService {
+  constructor() {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+  }
+
+  async sendTransactionCreated(
+    transaction: Transaction,
+    userEmail: string
+  ): Promise<void> {
+    await sgMail.send({
+      to: userEmail,
+      from: 'noreply@fintrack.com',
+      subject: 'Nova transação criada',
+      html: `
+        <h1>Transação Criada</h1>
+        <p>ID: ${transaction.getId()}</p>
+        <p>Valor: ${transaction.getAmount()}</p>
+      `
+    });
+  }
+
+  async sendBudgetAlert(userId: string, category: string): Promise<void> {
+    // Implementação
+  }
+}
+```
+
+**3. Application Service (Usa DI)**
+
+```typescript
+// src/application/services/TransactionService.ts
+
+import { injectable, inject } from 'tsyringe';
+
+@injectable()
+export class TransactionService {
+  constructor(
+    @inject('ITransactionRepository')
+    private repository: ITransactionRepository,
+
+    @inject('IEmailService')
+    private emailService: IEmailService,
+
+    @inject('ILogger')
+    private logger: ILogger
+  ) {}
+
+  async createTransaction(
+    userId: string,
+    data: CreateTransactionDTO
+  ): Promise<Transaction> {
+    this.logger.log(`Creating transaction for user ${userId}`);
+
+    // Validação
+    if (data.amount <= 0) {
+      throw new ValidationError('Amount must be positive');
+    }
+
+    // Criar transação
+    const transaction = await this.repository.create({
+      ...data,
+      userId
+    });
+
+    // Enviar email (assíncrono, não bloqueia)
+    this.emailService
+      .sendTransactionCreated(transaction, data.userEmail)
+      .catch(err => this.logger.error('Failed to send email', err));
+
+    return transaction;
+  }
+
+  async getTransactions(userId: string): Promise<Transaction[]> {
+    return this.repository.findByUserId(userId);
+  }
+}
+```
+
+**4. Configurar DI Container**
+
+```typescript
+// src/di/container.ts
+
+import { container } from 'tsyringe';
+import { PrismaClient } from '@prisma/client';
+
+// Registrar PrismaClient como singleton
+container.register('PrismaClient', {
+  useValue: new PrismaClient()
+});
+
+// Registrar repositories
+container.register('ITransactionRepository', {
+  useClass: PrismaTransactionRepository
+});
+
+// Registrar services
+container.register('IEmailService', {
+  useClass: SendGridEmailService
+});
+
+container.register('ILogger', {
+  useClass: WinstonLogger
+});
+
+export { container };
+```
+
+**5. Usar no Controller**
+
+```typescript
+// src/controllers/TransactionController.ts
+
+import { container } from '../di/container';
+
+export class TransactionController {
+  async create(req: Request, res: Response) {
+    try {
+      // ✅ Resolve automaticamente todas dependências
+      const transactionService = container.resolve(TransactionService);
+
+      const transaction = await transactionService.createTransaction(
+        req.userId!,
+        req.body
+      );
+
+      res.status(201).json(transaction);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  async list(req: Request, res: Response) {
+    const transactionService = container.resolve(TransactionService);
+
+    const transactions = await transactionService.getTransactions(
+      req.userId!
+    );
+
+    res.json(transactions);
+  }
+}
+```
+
+---
+
+#### TESTAR COM DI
+
+DI facilita MUITO os testes:
+
+```typescript
+// src/__tests__/services/TransactionService.test.ts
+
+import { TransactionService } from '../../application/services/TransactionService';
+
+describe('TransactionService', () => {
+  let service: TransactionService;
+  let mockRepository: jest.Mocked<ITransactionRepository>;
+  let mockEmailService: jest.Mocked<IEmailService>;
+  let mockLogger: jest.Mocked<ILogger>;
+
+  beforeEach(() => {
+    // ✅ Criar mocks
+    mockRepository = {
+      findById: jest.fn(),
+      findByUserId: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn()
+    };
+
+    mockEmailService = {
+      sendTransactionCreated: jest.fn(),
+      sendBudgetAlert: jest.fn()
+    };
+
+    mockLogger = {
+      log: jest.fn(),
+      error: jest.fn()
+    };
+
+    // ✅ Injetar mocks no service
+    service = new TransactionService(
+      mockRepository,
+      mockEmailService,
+      mockLogger
+    );
+  });
+
+  it('should create transaction', async () => {
+    // Arrange
+    const userId = 'user-123';
+    const data = {
+      amount: 100,
+      description: 'Test',
+      type: 'expense',
+      userEmail: 'user@example.com'
+    };
+
+    const mockTransaction = new Transaction(
+      'tx-1',
+      100,
+      'Test',
+      'expense',
+      userId
+    );
+
+    mockRepository.create.mockResolvedValue(mockTransaction);
+
+    // Act
+    const result = await service.createTransaction(userId, data);
+
+    // Assert
+    expect(result).toEqual(mockTransaction);
+    expect(mockRepository.create).toHaveBeenCalledWith({
+      ...data,
+      userId
+    });
+    expect(mockEmailService.sendTransactionCreated).toHaveBeenCalledWith(
+      mockTransaction,
+      data.userEmail
+    );
+  });
+
+  it('should throw error for invalid amount', async () => {
+    const data = { amount: -100, description: 'Test' };
+
+    await expect(
+      service.createTransaction('user-1', data)
+    ).rejects.toThrow('Amount must be positive');
+
+    // ✅ Repository não foi chamado
+    expect(mockRepository.create).not.toHaveBeenCalled();
+  });
+});
+```
+
+---
+
+#### QUANDO USAR DI
+
+✅ **USE DI para:**
+- Services que dependem de repositories
+- Services que dependem de outros services
+- Qualquer classe com dependências externas
+- Código que precisa ser testado
+
+❌ **NÃO USE DI para:**
+- Classes sem dependências
+- Funções puras
+- Value Objects simples
+- DTOs (Data Transfer Objects)
+
+---
+
+#### RESUMO DI
+
+```
+┌─────────────────────────────────────────────────────┐
+│  DEPENDENCY INJECTION                               │
+├─────────────────────────────────────────────────────┤
+│  ✅ Baixo acoplamento                                │
+│  ✅ Fácil testar (injetar mocks)                    │
+│  ✅ Fácil trocar implementações                      │
+│  ✅ Código mais limpo e organizado                   │
+│  ✅ Segue SOLID (Dependency Inversion Principle)    │
+├─────────────────────────────────────────────────────┤
+│  3 tipos: Constructor, Property, Method            │
+│  Recomendado: Constructor Injection                │
+│  DI Container: TSyringe, InversifyJS, Awilix       │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---

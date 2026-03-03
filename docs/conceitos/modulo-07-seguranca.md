@@ -21,7 +21,8 @@
 6. [Input Sanitization](#input-sanitization)
 7. [CORS Security](#cors-security)
 8. [Security Headers](#security-headers)
-9. [Checklist de Conhecimentos](#checklist-de-conhecimentos)
+9. [SSL/TLS e HTTPS - Transporte Seguro](#ssltls-e-https---transporte-seguro)
+10. [Checklist de Conhecimentos](#checklist-de-conhecimentos)
 
 ---
 
@@ -955,23 +956,461 @@ res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
 
 ---
 
+## SSL/TLS e HTTPS - Transporte Seguro
+
+### Por que SSL/TLS é Segurança Essencial?
+
+```
+┌─────────────────────────────────────────┐
+│  HTTP (Sem Criptografia) ❌             │
+├─────────────────────────────────────────┤
+│  Usuário ──► Senha: 123456 ──► Servidor│
+│                                         │
+│  ⚠️ Atacante pode ver:                  │
+│     - Senhas                            │
+│     - Tokens                            │
+│     - Dados pessoais                    │
+│     - Cookies de sessão                 │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  HTTPS (SSL/TLS) ✅                     │
+├─────────────────────────────────────────┤
+│  Usuário ──► %#@!*&$ ──► Servidor      │
+│           (criptografado)               │
+│                                         │
+│  ✅ Atacante vê apenas:                 │
+│     - Dados incompreensíveis            │
+│     - Não consegue modificar            │
+└─────────────────────────────────────────┘
+```
+
+### Ataques Sem HTTPS
+
+#### Man-in-the-Middle (MITM)
+
+```
+Sem HTTPS:
+Usuário ──► Senha: secret123 ──► Servidor
+                    │
+                    ▼
+               Atacante
+            (captura senha!)
+
+Com HTTPS:
+Usuário ──► aDf#8K!@pL9$ ──► Servidor
+         (criptografado)
+                    │
+                    ▼
+               Atacante
+            (vê apenas lixo!)
+```
+
+#### Session Hijacking
+
+```javascript
+// ❌ VULNERÁVEL: Cookie sem Secure flag
+res.cookie('session', token, {
+  httpOnly: true,
+  // Faltando: secure: true
+});
+
+// Atacante em rede pública (café, aeroporto):
+// 1. Captura cookie via HTTP
+// 2. Rouba sessão do usuário
+
+// ✅ SEGURO: Cookie com Secure flag
+res.cookie('session', token, {
+  httpOnly: true,
+  secure: true,  // ✅ Apenas HTTPS
+  sameSite: 'strict'
+});
+```
+
+### Configuração SSL/TLS no Backend
+
+#### Express com HTTPS
+
+```typescript
+// src/server.ts
+
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
+import express from 'express';
+
+const app = express();
+
+// ============================================
+// Opção 1: Certificado Let's Encrypt
+// ============================================
+const options = {
+  key: fs.readFileSync('/etc/letsencrypt/live/fintrack.com/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/fintrack.com/fullchain.pem')
+};
+
+// Servidor HTTPS (porta 443)
+https.createServer(options, app).listen(443, () => {
+  console.log('✅ HTTPS server running on port 443');
+});
+
+// Redirecionar HTTP → HTTPS
+http.createServer((req, res) => {
+  res.writeHead(301, {
+    Location: `https://${req.headers.host}${req.url}`
+  });
+  res.end();
+}).listen(80, () => {
+  console.log('🔄 HTTP redirect server running on port 80');
+});
+```
+
+```typescript
+// ============================================
+// Opção 2: Certificado Self-Signed (DEV APENAS!)
+// ============================================
+
+// Gerar certificado self-signed:
+// openssl req -nodes -new -x509 -keyout server.key -out server.cert
+
+const devOptions = {
+  key: fs.readFileSync('./certs/server.key'),
+  cert: fs.readFileSync('./certs/server.cert')
+};
+
+https.createServer(devOptions, app).listen(443);
+
+// ⚠️ Navegador vai mostrar aviso de segurança
+// Usar apenas em desenvolvimento local!
+```
+
+### Forçar HTTPS
+
+#### Middleware Express
+
+```typescript
+// src/middlewares/forceHttps.ts
+
+function forceHttps(req: Request, res: Response, next: NextFunction) {
+  // Em produção, força HTTPS
+  if (process.env.NODE_ENV === 'production' && !req.secure) {
+    // req.secure = true se HTTPS
+    // req.protocol = 'https' ou 'http'
+
+    // Redirecionar para HTTPS
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  }
+
+  next();
+}
+
+// Aplicar em todas rotas
+app.use(forceHttps);
+```
+
+#### Confiar em Proxy (Nginx, Cloudflare)
+
+```typescript
+// src/app.ts
+
+// ✅ Se usar Nginx/Load Balancer/Cloudflare como proxy
+app.set('trust proxy', 1);
+
+// Agora req.secure funciona corretamente
+// Nginx/Cloudflare adicionam header:
+// X-Forwarded-Proto: https
+```
+
+### HSTS (HTTP Strict Transport Security)
+
+#### O que é HSTS?
+
+```
+HSTS = Navegador força HTTPS automaticamente
+
+Primeira visita:
+1. Usuário: http://fintrack.com
+2. Servidor: Redirect → https://fintrack.com
+3. Servidor: Header "Strict-Transport-Security"
+4. Navegador: Salva regra "sempre HTTPS para fintrack.com"
+
+Próximas visitas:
+1. Usuário digita: http://fintrack.com
+2. Navegador: Converte automaticamente → https://fintrack.com
+3. ✅ Sem redirect, sem vulnerabilidade MITM
+```
+
+#### Configurar HSTS
+
+```typescript
+// src/middlewares/security.ts
+
+app.use((req, res, next) => {
+  if (req.secure) {
+    // HSTS: força HTTPS por 1 ano (31536000 segundos)
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains; preload'
+    );
+  }
+  next();
+});
+```
+
+**Flags:**
+- `max-age=31536000` - Duração (1 ano)
+- `includeSubDomains` - Aplica a todos subdomínios (api.fintrack.com, etc)
+- `preload` - Adiciona à lista HSTS preload dos navegadores
+
+#### HSTS Preload List
+
+```
+https://hstspreload.org/
+
+Adicionar domínio à lista hardcoded dos navegadores:
+✅ Proteção máxima desde primeira visita
+❌ Difícil reverter (precisa esperar expirar)
+
+Requisitos:
+1. Certificado válido
+2. HTTPS em todos subdomínios
+3. HSTS com: max-age >= 31536000, includeSubDomains, preload
+4. Redirecionar HTTP → HTTPS
+```
+
+### TLS Version e Ciphers
+
+#### Desabilitar TLS Antigas (Vulneráveis)
+
+```typescript
+// src/server.ts
+
+import https from 'https';
+import fs from 'fs';
+
+const options = {
+  key: fs.readFileSync('privkey.pem'),
+  cert: fs.readFileSync('fullchain.pem'),
+
+  // ✅ Apenas TLS 1.2 e TLS 1.3 (seguros)
+  minVersion: 'TLSv1.2',
+  maxVersion: 'TLSv1.3',
+
+  // ✅ Ciphers seguros (Mozilla Modern configuration)
+  ciphers: [
+    'TLS_AES_128_GCM_SHA256',
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    'ECDHE-RSA-AES256-GCM-SHA384'
+  ].join(':'),
+
+  // ✅ Preferir ciphers do servidor
+  honorCipherOrder: true
+};
+
+https.createServer(options, app).listen(443);
+```
+
+### Certificados em Produção
+
+#### Onde guardar certificados?
+
+```bash
+# ✅ BOM: Diretório protegido
+/etc/letsencrypt/live/fintrack.com/
+├── fullchain.pem  (certificado + chain)
+├── privkey.pem    (chave privada - SENSÍVEL!)
+├── chain.pem
+└── cert.pem
+
+# Permissões restritas
+sudo chmod 600 /etc/letsencrypt/live/fintrack.com/privkey.pem
+sudo chown root:root /etc/letsencrypt/live/fintrack.com/privkey.pem
+```
+
+```typescript
+// ❌ NUNCA commitar certificados no Git!
+// .gitignore
+certs/
+*.pem
+*.key
+*.crt
+
+// ✅ Usar variáveis de ambiente em produção
+const options = {
+  key: process.env.SSL_KEY,   // String com conteúdo
+  cert: process.env.SSL_CERT
+};
+```
+
+### Mixed Content (Conteúdo Misto)
+
+```
+Problema: Página HTTPS carrega recurso HTTP
+
+https://fintrack.com/app
+├── ✅ https://api.fintrack.com/data
+├── ❌ http://cdn.example.com/script.js  ← Bloqueado!
+└── ❌ http://images.example.com/logo.png ← Bloqueado!
+
+Navegador bloqueia recursos HTTP em páginas HTTPS!
+```
+
+#### Solução
+
+```typescript
+// ❌ Hardcoded HTTP
+<script src="http://cdn.example.com/script.js"></script>
+
+// ✅ Protocol-relative URL (herda protocolo da página)
+<script src="//cdn.example.com/script.js"></script>
+
+// ✅ HTTPS explícito
+<script src="https://cdn.example.com/script.js"></script>
+
+// ✅ Caminho relativo
+<script src="/js/script.js"></script>
+```
+
+```typescript
+// Content Security Policy - bloquear mixed content
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https:; script-src 'self' https://cdn.example.com"
+  );
+  next();
+});
+```
+
+### Certificate Pinning (Avançado)
+
+```typescript
+// src/config/certificatePinning.ts
+
+import https from 'https';
+import crypto from 'crypto';
+
+// SHA-256 fingerprint do certificado esperado
+const EXPECTED_FINGERPRINT = 'AA:BB:CC:DD:EE:FF...';
+
+const agent = new https.Agent({
+  checkServerIdentity: (host, cert) => {
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(cert.raw)
+      .digest('hex')
+      .toUpperCase()
+      .match(/.{2}/g)!
+      .join(':');
+
+    if (fingerprint !== EXPECTED_FINGERPRINT) {
+      throw new Error('Certificate pinning failed!');
+    }
+  }
+});
+
+// Usar em requisições externas críticas
+fetch('https://api.payment-gateway.com/charge', {
+  agent,
+  method: 'POST',
+  body: JSON.stringify({ amount: 1000 })
+});
+```
+
+### Testing SSL/TLS
+
+```bash
+# Testar handshake SSL
+openssl s_client -connect fintrack.com:443 -showcerts
+
+# Ver certificado
+echo | openssl s_client -connect fintrack.com:443 2>/dev/null | \
+  openssl x509 -noout -text
+
+# Testar apenas TLS 1.2
+openssl s_client -connect fintrack.com:443 -tls1_2
+
+# Testar TLS 1.3
+openssl s_client -connect fintrack.com:443 -tls1_3
+
+# Ver expiração do certificado
+echo | openssl s_client -connect fintrack.com:443 2>/dev/null | \
+  openssl x509 -noout -dates
+
+# Verificar cipher suite
+nmap --script ssl-enum-ciphers -p 443 fintrack.com
+
+# Scan completo de vulnerabilidades SSL
+testssl.sh fintrack.com
+```
+
+### Checklist SSL/TLS
+
+```
+✅ Certificado válido (Let's Encrypt ou CA confiável)
+✅ HTTPS configurado (porta 443)
+✅ HTTP redireciona para HTTPS (porta 80 → 443)
+✅ HSTS header configurado
+✅ Apenas TLS 1.2 e TLS 1.3 habilitados
+✅ Ciphers seguros (Mozilla Modern)
+✅ Certificado não expira em < 30 dias
+✅ Renovação automática (certbot timer)
+✅ Sem mixed content (todos recursos em HTTPS)
+✅ Secure flag em cookies
+✅ Trust proxy configurado (se usar Nginx)
+✅ SSL Labs grade A ou A+
+✅ Sem vulnerabilidades (Heartbleed, POODLE, etc)
+```
+
+---
+
 ## Checklist de Conhecimentos
 
+### Vulnerabilidades e Proteções
 - [ ] OWASP Top 10 vulnerabilidades
 - [ ] Broken Access Control (autorização)
 - [ ] Cryptographic Failures (encriptação)
-- [ ] SQL Injection prevention
-- [ ] Validação de entrada (Zod)
+- [ ] SQL Injection prevention (Prisma, prepared statements)
+- [ ] XSS prevention (sanitização, CSP)
+- [ ] CSRF prevention (SameSite cookies, tokens)
+- [ ] Validação de entrada (Zod, sanitização)
+
+### Autenticação e Autorização
 - [ ] Autenticação forte (JWT)
-- [ ] Bcrypt para hash de senhas
-- [ ] Access + Refresh tokens
-- [ ] Rate limiting
-- [ ] Input sanitization (XSS prevention)
-- [ ] CORS configuration
-- [ ] Security headers (Helmet)
-- [ ] HTTPS/TLS
+- [ ] Bcrypt para hash de senhas (salt rounds)
+- [ ] Access + Refresh tokens (rotação)
+- [ ] Password policies (requisitos mínimos)
+- [ ] MFA/2FA concepts
+
+### Proteção de API
+- [ ] Rate limiting (express-rate-limit)
+- [ ] Input sanitization
+- [ ] CORS configuration (whitelist)
+- [ ] Security headers (Helmet.js)
+- [ ] Request validation (middleware)
+
+### SSL/TLS e HTTPS
+- [ ] Por que HTTPS é essencial
+- [ ] Ataques sem HTTPS (MITM, session hijacking)
+- [ ] Configurar HTTPS no Express
+- [ ] Forçar HTTPS (redirect middleware)
+- [ ] HSTS (HTTP Strict Transport Security)
+- [ ] TLS versions (1.2, 1.3)
+- [ ] Ciphers seguros
+- [ ] Certificados (Let's Encrypt)
+- [ ] Mixed content prevention
+- [ ] Secure flag em cookies
+- [ ] Trust proxy configuration
+- [ ] Testing SSL/TLS (openssl, SSL Labs)
+
+### Monitoramento e Boas Práticas
 - [ ] Logging e monitoring
+- [ ] Secrets management (env vars, vault)
 - [ ] Dependências seguras (npm audit)
+- [ ] Least privilege principle
+- [ ] Security updates automáticas
 
 ---
 

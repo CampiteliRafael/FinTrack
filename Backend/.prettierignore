@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+logs/
+
+# Prisma generated
+prisma/generated/
+
+# Environment files
+.env
+.env.*
+
+# Docs
+docs/openapi.yaml
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

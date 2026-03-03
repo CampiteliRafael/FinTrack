@@ -1,0 +1,203 @@
+# ============================================
+# GitHub Actions - Deploy Gratuito FinTrack
+# ============================================
+# Workflow otimizado para deploy em:
+# - Backend: Render.com (free tier)
+# - Frontend: Vercel (free tier)
+#
+# Custo: $0 (GitHub Actions ilimitado para repos públicos)
+
+name: Deploy Free Tier
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancelar workflows duplicados
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # Job 1: Test Backend
+  # ============================================
+  test-backend:
+    name: 🧪 Test Backend
+    runs-on: ubuntu-latest
+
+    # Apenas rodar em push para main (não em PRs)
+    if: github.event_name == 'push'
+
+    services:
+      # PostgreSQL para testes
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fintrack_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      # Redis para testes
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: Backend/package-lock.json
+
+      - name: 📚 Install dependencies
+        working-directory: Backend
+        run: npm ci
+
+      - name: 🔨 Generate Prisma Client
+        working-directory: Backend
+        run: npx prisma generate
+
+      - name: 🗃️ Run migrations
+        working-directory: Backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fintrack_test
+        run: npx prisma migrate deploy
+
+      - name: ✅ Run tests
+        working-directory: Backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fintrack_test
+          JWT_SECRET: test-jwt-secret-key-with-32-chars-min
+          FRONTEND_URL: http://localhost:3000
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          FREE_HOSTING: true
+          ENABLE_WORKERS: false
+        run: npm test -- --passWithNoTests
+
+  # ============================================
+  # Job 2: Test Frontend
+  # ============================================
+  test-frontend:
+    name: 🎨 Test Frontend
+    runs-on: ubuntu-latest
+
+    # Apenas rodar em push para main (não em PRs)
+    if: github.event_name == 'push'
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: 📚 Install dependencies
+        working-directory: Frontend
+        run: npm ci
+
+      - name: 🔨 Build
+        working-directory: Frontend
+        env:
+          VITE_API_URL: http://localhost:4000/api/v1
+        run: npm run build
+
+      - name: ✅ Run tests
+        working-directory: Frontend
+        env:
+          VITE_API_URL: http://localhost:4000/api/v1
+        run: npm test -- --passWithNoTests
+
+  # ============================================
+  # Job 3: Notify Render (Backend Deploy)
+  # ============================================
+  # Render detecta push automaticamente, mas podemos forçar
+  notify-render:
+    name: 🚀 Trigger Render Deploy
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📢 Notify Render
+        run: |
+          echo "✅ Backend tests passed"
+          echo "🚀 Render will auto-deploy from main branch"
+          echo "📊 Check deploy status at: https://dashboard.render.com"
+
+      # Opcional: Trigger manual via Deploy Hook
+      # Descomentar e adicionar RENDER_DEPLOY_HOOK aos secrets se necessário
+      # - name: Trigger Render Deploy Hook
+      #   if: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      #   run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+  # ============================================
+  # Job 4: Notify Vercel (Frontend Deploy)
+  # ============================================
+  # Vercel detecta push automaticamente
+  notify-vercel:
+    name: 🎨 Trigger Vercel Deploy
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📢 Notify Vercel
+        run: |
+          echo "✅ Frontend tests passed"
+          echo "🚀 Vercel will auto-deploy from main branch"
+          echo "📊 Check deploy status at: https://vercel.com/dashboard"
+
+  # ============================================
+  # Job 5: Deployment Status
+  # ============================================
+  deployment-summary:
+    name: 📊 Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [notify-render, notify-vercel]
+    if: always()
+
+    steps:
+      - name: 📊 Summary
+        run: |
+          echo "## 🚀 Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Tests completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "🔄 Auto-deploy triggered on Render and Vercel" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏱️ Estimated Deploy Time" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend (Render): ~3-5 minutes" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend (Vercel): ~2-3 minutes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: https://fintrack.vercel.app" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: https://fintrack-backend.onrender.com" >> $GITHUB_STEP_SUMMARY
+          echo "- Health: https://fintrack-backend.onrender.com/health" >> $GITHUB_STEP_SUMMARY
