@@ -238,7 +238,7 @@ describe('TransactionService', () => {
 
       await transactionService.update(transactionId, userId, updateData);
 
-      expect(mockTransactionRepository.update).toHaveBeenCalledWith(transactionId, userId, {
+      expect(mockTransactionRepository.update).toHaveBeenCalledWith(transactionId, {
         description: 'Updated description',
       });
       expect(mockTransactionRepository.updateWithBalanceUpdate).not.toHaveBeenCalled();

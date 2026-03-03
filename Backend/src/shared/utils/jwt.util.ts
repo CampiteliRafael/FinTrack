@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { jwtConfig } from '../../config/jwt';
 
@@ -9,9 +9,10 @@ export interface JwtPayload {
 
 export class JwtUtil {
   static signAccessToken(payload: JwtPayload): string {
-    return jwt.sign(payload, jwtConfig.secret, {
-      expiresIn: jwtConfig.accessTokenExpiresIn,
-    });
+    const options: SignOptions = {
+      expiresIn: Number(jwtConfig.accessTokenExpiresIn),
+    };
+    return jwt.sign(payload, jwtConfig.secret, options);
   }
 
   static generateRefreshToken(): string {

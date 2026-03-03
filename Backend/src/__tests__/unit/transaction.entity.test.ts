@@ -12,6 +12,7 @@ describe('Transaction Entity', () => {
     date: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
+    deletedAt: null,
   };
 
   describe('constructor', () => {
@@ -26,7 +27,8 @@ describe('Transaction Entity', () => {
         validData.description,
         validData.date,
         validData.createdAt,
-        validData.updatedAt
+        validData.updatedAt,
+        validData.deletedAt
       );
 
       expect(transaction.id).toBe(validData.id);
@@ -46,7 +48,8 @@ describe('Transaction Entity', () => {
           validData.description,
           validData.date,
           validData.createdAt,
-          validData.updatedAt
+          validData.updatedAt,
+          validData.deletedAt
         );
       }).toThrow('Amount must be positive');
     });
