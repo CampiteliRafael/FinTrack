@@ -10,7 +10,7 @@ export interface JwtPayload {
 export class JwtUtil {
   static signAccessToken(payload: JwtPayload): string {
     const options: SignOptions = {
-      expiresIn: Number(jwtConfig.accessTokenExpiresIn),
+      expiresIn: jwtConfig.accessTokenExpiresIn,
     };
     return jwt.sign(payload, jwtConfig.secret, options);
   }
