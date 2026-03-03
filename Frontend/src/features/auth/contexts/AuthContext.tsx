@@ -18,10 +18,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Limpar tokens antigos do localStorage (migração)
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-
     loadUser();
   }, []);
 
@@ -61,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await authService.logout(refreshToken);
       }
     } catch (error) {
-      // Ignorar erro de logout
     } finally {
       sessionStorage.removeItem('accessToken');
       sessionStorage.removeItem('refreshToken');

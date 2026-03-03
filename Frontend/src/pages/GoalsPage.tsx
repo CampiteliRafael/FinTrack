@@ -24,9 +24,9 @@ export function GoalsPage() {
   const toast = useToast();
 
   useEffect(() => {
-    // Carregar dados em paralelo
     Promise.all([fetchGoals(), fetchCategories()]);
-  }, [fetchGoals, fetchCategories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreate = useCallback(() => {
     setSelectedGoal(undefined);

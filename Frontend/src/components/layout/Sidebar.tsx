@@ -43,7 +43,6 @@ export function Sidebar({
   const isActive = (path: string) => location.pathname === path;
 
   const handleLinkClick = () => {
-    // Close mobile sidebar when a link is clicked
     onCloseMobile();
   };
 
@@ -54,27 +53,22 @@ export function Sidebar({
 
   return (
     <>
-      {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onCloseMobile} />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           'fixed left-0 top-0 z-50 h-full',
           'bg-background-secondary border-r border-primary',
           'flex flex-col',
           'transition-all duration-300 ease-in-out',
-          // Desktop - lower z-index to stay below header
           'md:z-20',
           isCollapsed ? 'md:w-[64px]' : 'md:w-[240px]',
-          // Mobile
           'w-[240px]',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
       >
-        {/* Logo Section */}
         <div className="flex items-center justify-between h-[64px] px-4 border-b border-primary">
           <div className="flex items-center gap-3">
             <Wallet className="w-8 h-8 text-accent-primary" />
@@ -83,7 +77,6 @@ export function Sidebar({
             )}
           </div>
 
-          {/* Mobile Close Button */}
           <button
             onClick={onCloseMobile}
             className="md:hidden p-2 rounded-lg hover:bg-background-tertiary transition-colors"
@@ -92,7 +85,6 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
           <ul className="space-y-1">
             {navigation.map((item) => {
@@ -122,7 +114,6 @@ export function Sidebar({
                     />
                     {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
 
-                    {/* Tooltip for collapsed state */}
                     {isCollapsed && (
                       <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-background-secondary border border-primary shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                         <span className="text-sm text-foreground-primary">{item.label}</span>
@@ -135,7 +126,6 @@ export function Sidebar({
           </ul>
         </nav>
 
-        {/* User Section */}
         <div className="border-t border-primary p-3">
           {!isCollapsed ? (
             <>
@@ -158,14 +148,12 @@ export function Sidebar({
               title="Sair"
             >
               <LogOut className="w-5 h-5" />
-              {/* Tooltip */}
               <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-background-secondary border border-primary shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                 <span className="text-sm text-foreground-primary">Sair</span>
               </div>
             </button>
           )}
 
-          {/* Collapse Toggle (Desktop Only) */}
           <button
             onClick={onToggleCollapse}
             className="hidden md:flex w-full items-center justify-center mt-2 p-2 rounded-lg text-foreground-secondary hover:bg-background-tertiary transition-colors"

@@ -31,9 +31,9 @@ export function InstallmentsPage() {
   const toast = useToast();
 
   useEffect(() => {
-    // Carregar dados em paralelo
     Promise.all([fetchInstallments(), fetchAccounts(), fetchCategories()]);
-  }, [fetchInstallments, fetchAccounts, fetchCategories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreate = useCallback(() => {
     setSelectedInstallment(undefined);

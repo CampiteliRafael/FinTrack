@@ -47,7 +47,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboard();
-  }, [loadDashboard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading && !summary) {
     return <DashboardSkeleton />;
@@ -57,7 +58,13 @@ export default function DashboardPage() {
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
         <h2 className="text-lg sm:text-xl font-bold">Dashboard</h2>
-        <Button variant="secondary" size="sm" onClick={loadDashboard} disabled={loading} className="w-full sm:w-auto">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={loadDashboard}
+          disabled={loading}
+          className="w-full sm:w-auto"
+        >
           {loading ? 'Carregando...' : 'Atualizar'}
         </Button>
       </div>

@@ -67,9 +67,11 @@ function App() {
                         <Route
                           path="/"
                           element={
-                            <PublicLayout>
-                              <LandingPage />
-                            </PublicLayout>
+                            <PublicRoute>
+                              <PublicLayout>
+                                <LandingPage />
+                              </PublicLayout>
+                            </PublicRoute>
                           }
                         />
                         <Route

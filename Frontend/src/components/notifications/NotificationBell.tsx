@@ -10,9 +10,7 @@ export function NotificationBell() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Apenas carregar se estiver autenticado
     loadUnreadCount();
-    // Atualizar contador a cada 30 segundos
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -89,7 +87,6 @@ export function NotificationBell() {
 
   return (
     <div className="relative">
-      {/* Bell Button */}
       <button
         onClick={handleToggle}
         className="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
@@ -115,10 +112,8 @@ export function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl z-50 border border-gray-200">
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">
               Notificações
@@ -133,7 +128,6 @@ export function NotificationBell() {
             )}
           </div>
 
-          {/* List */}
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <div className="p-4 text-center text-gray-500">
@@ -236,7 +230,6 @@ export function NotificationBell() {
         </div>
       )}
 
-      {/* Overlay to close dropdown */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40"
