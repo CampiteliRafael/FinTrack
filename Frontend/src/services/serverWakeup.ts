@@ -23,14 +23,14 @@ export function isColdStartError(error: unknown): boolean {
 }
 
 export async function waitForServerWakeUp(
-  maxAttempts: number = 18,
+  maxAttempts: number = 24,
   intervalMs: number = 5000,
   onProgress?: (attempt: number, maxAttempts: number) => void
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await axios.get(`${API_URL}/health`, {
-        timeout: 5000,
+        timeout: 8000,
       });
 
       return true;
@@ -68,12 +68,20 @@ export async function requestWithColdStartRetry<T>(
       onWakeUpStart();
     }
 
-    const isAwake = await waitForServerWakeUp(18, 5000, onWakeUpProgress);
+    const isAwake = await waitForServerWakeUp(24, 5000, onWakeUpProgress);
 
     if (!isAwake) {
       throw new Error('Servidor não está respondendo. Tente novamente mais tarde.');
     }
 
-    return await requestFn();
+    try {
+      return await requestFn();
+    } catch (retryError: unknown) {
+      if (isColdStartError(retryError)) {
+        await sleep(5000);
+        return await requestFn();
+      }
+      throw retryError;
+    }
   }
 }
