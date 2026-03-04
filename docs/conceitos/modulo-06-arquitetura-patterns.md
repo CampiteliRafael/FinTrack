@@ -1878,6 +1878,776 @@ app.post('/api/transacoes', (req, res, next) =>
 
 ---
 
+## Event-Driven Architecture
+
+### O que é Arquitetura Orientada a Eventos?
+
+Event-Driven Architecture (EDA) é um padrão onde **mudanças de estado** (eventos) disparam ações em diferentes partes do sistema, sem acoplamento direto entre elas.
+
+```
+ARQUITETURA TRADICIONAL (Acoplada)
+┌─────────────────────────────────────────┐
+│  Service A chama Service B diretamente  │
+│                                         │
+│   TransacaoService                      │
+│        │                                │
+│        ├──→ ContaService.atualizar()   │
+│        ├──→ EmailService.enviar()      │
+│        ├──→ NotificacaoService.criar() │
+│        └──→ RelatorioService.atualizar()│
+│                                         │
+│  ❌ Acoplamento forte                  │
+│  ❌ Service A precisa conhecer todos    │
+│  ❌ Difícil adicionar novos listeners   │
+└─────────────────────────────────────────┘
+
+ARQUITETURA ORIENTADA A EVENTOS (Desacoplada)
+┌─────────────────────────────────────────┐
+│  Service A emite evento, outros ouvem   │
+│                                         │
+│   TransacaoService                      │
+│        │                                │
+│        └──→ EventBus.publish()         │
+│                  │                      │
+│         ┌────────┼────────┬──────────┐ │
+│         ▼        ▼        ▼          ▼ │
+│    ContaService EmailSvc NotifSvc ReportSvc
+│                                         │
+│  ✅ Desacoplamento                     │
+│  ✅ Adicionar listeners é fácil        │
+│  ✅ Cada serviço é independente        │
+└─────────────────────────────────────────┘
+```
+
+### Por que Usar Event-Driven?
+
+**Benefícios:**
+- ✅ **Desacoplamento** - Serviços não se conhecem diretamente
+- ✅ **Escalabilidade** - Processar eventos assíncronamente
+- ✅ **Extensibilidade** - Adicionar novos listeners sem modificar código existente
+- ✅ **Auditoria** - Event log completo de tudo que aconteceu
+- ✅ **Resiliência** - Retry automático de eventos falhados
+
+**Quando usar:**
+- ✅ Sistemas com múltiplos efeitos colaterais (enviar email, notificação, atualizar cache)
+- ✅ Integração entre microserviços
+- ✅ Necessidade de auditoria completa
+- ✅ Processos assíncronos e filas
+
+---
+
+### Conceitos Fundamentais
+
+#### 1. Evento (Event)
+
+Um evento é algo que **já aconteceu** no sistema.
+
+```typescript
+// ❌ Comando (imperativo - ordem)
+{
+  action: 'CREATE_TRANSACTION',
+  data: { ... }
+}
+
+// ✅ Evento (passado - fato)
+{
+  type: 'TRANSACTION_CREATED',
+  timestamp: '2026-03-04T10:00:00Z',
+  aggregateId: 'txn-123',
+  data: {
+    userId: 'user-1',
+    accountId: 'acc-1',
+    amount: 100,
+    type: 'expense',
+  },
+  metadata: {
+    correlationId: 'req-abc',
+    causationId: 'evt-001',
+  }
+}
+```
+
+**Boas práticas:**
+- Nome no passado: `TransactionCreated`, não `CreateTransaction`
+- Imutável: Não pode ser modificado
+- Self-contained: Contém todos os dados necessários
+
+---
+
+#### 2. Event Bus / Message Broker
+
+Intermediário que distribui eventos aos interessados.
+
+```
+┌──────────────────────────────────────────┐
+│            EVENT BUS                     │
+│                                          │
+│  Publishers ──→ [Queue] ──→ Subscribers │
+│                                          │
+│  • In-Memory (EventEmitter)             │
+│  • Redis Pub/Sub                         │
+│  • RabbitMQ                              │
+│  • Apache Kafka                          │
+│  • AWS SQS/SNS                           │
+└──────────────────────────────────────────┘
+```
+
+---
+
+### Implementação Básica (In-Memory)
+
+#### 1. Event Bus Simples (Node.js)
+
+```typescript
+// src/events/EventBus.ts
+import { EventEmitter } from 'events';
+
+export class EventBus {
+  private emitter: EventEmitter;
+
+  constructor() {
+    this.emitter = new EventEmitter();
+    this.emitter.setMaxListeners(50); // Evitar warning
+  }
+
+  // Publicar evento
+  publish(eventName: string, data: any): void {
+    console.log(`[EventBus] Publishing: ${eventName}`, data);
+    this.emitter.emit(eventName, data);
+  }
+
+  // Inscrever-se em evento
+  subscribe(eventName: string, handler: (data: any) => void): void {
+    console.log(`[EventBus] Subscribed to: ${eventName}`);
+    this.emitter.on(eventName, handler);
+  }
+
+  // Inscrever-se uma vez
+  subscribeOnce(eventName: string, handler: (data: any) => void): void {
+    this.emitter.once(eventName, handler);
+  }
+
+  // Remover inscricao
+  unsubscribe(eventName: string, handler: (data: any) => void): void {
+    this.emitter.off(eventName, handler);
+  }
+}
+
+// Singleton
+export const eventBus = new EventBus();
+```
+
+---
+
+#### 2. Definir Eventos
+
+```typescript
+// src/events/transaction.events.ts
+
+export const TRANSACTION_EVENTS = {
+  CREATED: 'transaction.created',
+  UPDATED: 'transaction.updated',
+  DELETED: 'transaction.deleted',
+};
+
+export interface TransactionCreatedEvent {
+  transactionId: string;
+  userId: string;
+  accountId: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  date: Date;
+  createdAt: Date;
+}
+
+export interface TransactionUpdatedEvent {
+  transactionId: string;
+  userId: string;
+  changes: Partial<Transaction>;
+  updatedAt: Date;
+}
+```
+
+---
+
+#### 3. Publicar Eventos (Publisher)
+
+```typescript
+// src/services/TransactionService.ts
+import { eventBus } from '../events/EventBus';
+import { TRANSACTION_EVENTS, TransactionCreatedEvent } from '../events/transaction.events';
+
+export class TransactionService {
+  async create(data: CreateTransactionDTO) {
+    // 1. Criar transação no banco
+    const transaction = await this.repository.create(data);
+
+    // 2. Emitir evento
+    const event: TransactionCreatedEvent = {
+      transactionId: transaction.id,
+      userId: transaction.userId,
+      accountId: transaction.accountId,
+      amount: transaction.amount,
+      type: transaction.type,
+      category: transaction.category,
+      date: transaction.date,
+      createdAt: new Date(),
+    };
+
+    eventBus.publish(TRANSACTION_EVENTS.CREATED, event);
+
+    return transaction;
+  }
+}
+```
+
+---
+
+#### 4. Ouvir Eventos (Subscribers)
+
+```typescript
+// src/listeners/AccountBalanceListener.ts
+import { eventBus } from '../events/EventBus';
+import { TRANSACTION_EVENTS, TransactionCreatedEvent } from '../events/transaction.events';
+
+export class AccountBalanceListener {
+  constructor(private accountService: AccountService) {
+    this.subscribe();
+  }
+
+  private subscribe() {
+    eventBus.subscribe(TRANSACTION_EVENTS.CREATED, this.handleTransactionCreated.bind(this));
+  }
+
+  private async handleTransactionCreated(event: TransactionCreatedEvent) {
+    try {
+      console.log('[AccountBalanceListener] Atualizando saldo...');
+
+      await this.accountService.updateBalance({
+        accountId: event.accountId,
+        amount: event.amount,
+        type: event.type,
+      });
+
+      console.log('[AccountBalanceListener] Saldo atualizado!');
+    } catch (error) {
+      console.error('[AccountBalanceListener] Erro:', error);
+      // Implementar retry logic aqui
+    }
+  }
+}
+```
+
+```typescript
+// src/listeners/EmailNotificationListener.ts
+export class EmailNotificationListener {
+  constructor(private emailService: EmailService) {
+    this.subscribe();
+  }
+
+  private subscribe() {
+    eventBus.subscribe(TRANSACTION_EVENTS.CREATED, this.handleTransactionCreated.bind(this));
+  }
+
+  private async handleTransactionCreated(event: TransactionCreatedEvent) {
+    try {
+      console.log('[EmailNotificationListener] Enviando email...');
+
+      await this.emailService.send({
+        to: event.userId,
+        subject: 'Nova transação registrada',
+        template: 'transaction-created',
+        data: event,
+      });
+
+      console.log('[EmailNotificationListener] Email enviado!');
+    } catch (error) {
+      console.error('[EmailNotificationListener] Erro:', error);
+    }
+  }
+}
+```
+
+```typescript
+// src/listeners/NotificationListener.ts
+export class NotificationListener {
+  constructor(private notificationService: NotificationService) {
+    this.subscribe();
+  }
+
+  private subscribe() {
+    eventBus.subscribe(TRANSACTION_EVENTS.CREATED, this.handleTransactionCreated.bind(this));
+  }
+
+  private async handleTransactionCreated(event: TransactionCreatedEvent) {
+    await this.notificationService.create({
+      userId: event.userId,
+      type: 'TRANSACTION_CREATED',
+      message: `Nova transação de R$ ${event.amount}`,
+      data: event,
+    });
+  }
+}
+```
+
+---
+
+#### 5. Registrar Listeners (Bootstrap)
+
+```typescript
+// src/server.ts
+import { eventBus } from './events/EventBus';
+import { AccountBalanceListener } from './listeners/AccountBalanceListener';
+import { EmailNotificationListener } from './listeners/EmailNotificationListener';
+import { NotificationListener } from './listeners/NotificationListener';
+
+// Instanciar serviços
+const accountService = new AccountService();
+const emailService = new EmailService();
+const notificationService = new NotificationService();
+
+// Registrar listeners
+new AccountBalanceListener(accountService);
+new EmailNotificationListener(emailService);
+new NotificationListener(notificationService);
+
+console.log('[Server] Event listeners registrados!');
+
+// Agora quando uma transação for criada, todos os 3 listeners serão notificados automaticamente!
+```
+
+---
+
+### Implementação com Redis Pub/Sub
+
+Para sistemas distribuídos (múltiplas instâncias da aplicação):
+
+```typescript
+// src/events/RedisEventBus.ts
+import Redis from 'ioredis';
+
+export class RedisEventBus {
+  private publisher: Redis;
+  private subscriber: Redis;
+
+  constructor() {
+    this.publisher = new Redis(process.env.REDIS_URL);
+    this.subscriber = new Redis(process.env.REDIS_URL);
+  }
+
+  async publish(eventName: string, data: any): Promise<void> {
+    const payload = JSON.stringify(data);
+    await this.publisher.publish(eventName, payload);
+    console.log(`[RedisEventBus] Published: ${eventName}`);
+  }
+
+  async subscribe(eventName: string, handler: (data: any) => Promise<void>): Promise<void> {
+    await this.subscriber.subscribe(eventName);
+
+    this.subscriber.on('message', async (channel, message) => {
+      if (channel === eventName) {
+        try {
+          const data = JSON.parse(message);
+          await handler(data);
+        } catch (error) {
+          console.error(`[RedisEventBus] Error handling ${eventName}:`, error);
+        }
+      }
+    });
+
+    console.log(`[RedisEventBus] Subscribed to: ${eventName}`);
+  }
+}
+
+export const eventBus = new RedisEventBus();
+```
+
+**Vantagens do Redis:**
+- ✅ Funciona com múltiplas instâncias da aplicação
+- ✅ Eventos distribuídos entre servidores
+- ✅ Escalável horizontalmente
+
+---
+
+### Implementação com Message Queue (RabbitMQ/SQS)
+
+Para garantia de entrega e retry automático:
+
+```typescript
+// src/events/RabbitMQEventBus.ts
+import amqp from 'amqplib';
+
+export class RabbitMQEventBus {
+  private connection: amqp.Connection;
+  private channel: amqp.Channel;
+
+  async connect() {
+    this.connection = await amqp.connect(process.env.RABBITMQ_URL);
+    this.channel = await this.connection.createChannel();
+  }
+
+  async publish(eventName: string, data: any): Promise<void> {
+    const exchange = 'fintrack.events';
+    await this.channel.assertExchange(exchange, 'topic', { durable: true });
+
+    const message = Buffer.from(JSON.stringify(data));
+    this.channel.publish(exchange, eventName, message, { persistent: true });
+
+    console.log(`[RabbitMQ] Published: ${eventName}`);
+  }
+
+  async subscribe(eventName: string, handler: (data: any) => Promise<void>): Promise<void> {
+    const exchange = 'fintrack.events';
+    const queue = `fintrack.${eventName}`;
+
+    await this.channel.assertExchange(exchange, 'topic', { durable: true });
+    await this.channel.assertQueue(queue, { durable: true });
+    await this.channel.bindQueue(queue, exchange, eventName);
+
+    this.channel.consume(queue, async (msg) => {
+      if (msg) {
+        try {
+          const data = JSON.parse(msg.content.toString());
+          await handler(data);
+          this.channel.ack(msg); // ✅ Confirma processamento
+        } catch (error) {
+          console.error(`[RabbitMQ] Error:`, error);
+          this.channel.nack(msg, false, true); // ❌ Rejeita e requeue
+        }
+      }
+    });
+
+    console.log(`[RabbitMQ] Subscribed to: ${eventName}`);
+  }
+}
+```
+
+**Vantagens das Queues:**
+- ✅ Garantia de entrega (at-least-once)
+- ✅ Retry automático em caso de falha
+- ✅ Dead Letter Queue para eventos que falharam múltiplas vezes
+- ✅ Persistência (eventos não são perdidos se servidor cair)
+
+---
+
+### Event Sourcing
+
+Event Sourcing é um padrão onde **o estado da aplicação** é derivado de uma sequência de eventos.
+
+```
+TRADICIONAL (State-based)
+┌────────────────────────────────┐
+│  Database guarda ESTADO ATUAL  │
+│                                │
+│  conta: {                      │
+│    id: 1,                      │
+│    saldo: 500  ← Estado atual  │
+│  }                             │
+│                                │
+│  ❌ Perdeu histórico           │
+└────────────────────────────────┘
+
+EVENT SOURCING (Event-based)
+┌────────────────────────────────┐
+│  Database guarda EVENTOS       │
+│                                │
+│  1. ContaCriada (saldo: 0)     │
+│  2. DepositoRealizado (+100)   │
+│  3. SaqueRealizado (-50)       │
+│  4. DepositoRealizado (+450)   │
+│  = Saldo atual: 500            │
+│                                │
+│  ✅ Histórico completo         │
+│  ✅ Auditoria natural          │
+│  ✅ Replay de eventos          │
+└────────────────────────────────┘
+```
+
+#### Implementação Básica
+
+```typescript
+// src/events/EventStore.ts
+export interface StoredEvent {
+  id: string;
+  aggregateId: string;  // ID da entidade (ex: conta-1)
+  aggregateType: string; // Tipo (ex: Account)
+  eventType: string;     // Tipo do evento
+  data: any;
+  metadata: any;
+  version: number;       // Versão do aggregate
+  timestamp: Date;
+}
+
+export class EventStore {
+  async append(event: StoredEvent): Promise<void> {
+    await prisma.event.create({ data: event });
+  }
+
+  async getEvents(aggregateId: string): Promise<StoredEvent[]> {
+    return await prisma.event.findMany({
+      where: { aggregateId },
+      orderBy: { version: 'asc' },
+    });
+  }
+
+  async getEventsByType(aggregateId: string, eventType: string): Promise<StoredEvent[]> {
+    return await prisma.event.findMany({
+      where: { aggregateId, eventType },
+      orderBy: { version: 'asc' },
+    });
+  }
+}
+```
+
+```typescript
+// src/aggregates/Account.ts
+export class Account {
+  id: string;
+  balance: number = 0;
+  version: number = 0;
+
+  // Aplicar evento
+  apply(event: StoredEvent) {
+    switch (event.eventType) {
+      case 'ACCOUNT_CREATED':
+        this.id = event.data.accountId;
+        this.balance = 0;
+        break;
+
+      case 'DEPOSIT_MADE':
+        this.balance += event.data.amount;
+        break;
+
+      case 'WITHDRAWAL_MADE':
+        this.balance -= event.data.amount;
+        break;
+    }
+
+    this.version = event.version;
+  }
+
+  // Reconstruir estado a partir de eventos
+  static fromEvents(events: StoredEvent[]): Account {
+    const account = new Account();
+    events.forEach(event => account.apply(event));
+    return account;
+  }
+}
+
+// Uso:
+const events = await eventStore.getEvents('conta-1');
+const account = Account.fromEvents(events);
+console.log(account.balance); // 500 (calculado dos eventos)
+```
+
+---
+
+### CQRS (Command Query Responsibility Segregation)
+
+CQRS separa operações de **leitura** (queries) e **escrita** (commands).
+
+```
+┌─────────────────────────────────────────┐
+│          CQRS Pattern                   │
+├─────────────────────────────────────────┤
+│                                         │
+│  WRITE MODEL (Commands)                 │
+│  ┌─────────────────────────────────┐   │
+│  │  Command → Handler → EventStore │   │
+│  │  (validação, regras de negócio) │   │
+│  └─────────────────────────────────┘   │
+│           │                             │
+│           │ events                      │
+│           ▼                             │
+│  ┌─────────────────────────────────┐   │
+│  │      Event Projections          │   │
+│  │  (atualiza read models)         │   │
+│  └─────────────────────────────────┘   │
+│           │                             │
+│           ▼                             │
+│  READ MODEL (Queries)                   │
+│  ┌─────────────────────────────────┐   │
+│  │  Query → Read Database          │   │
+│  │  (otimizado para leitura)       │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+```
+
+```typescript
+// WRITE MODEL
+class CreateTransactionCommand {
+  async execute(data: CreateTransactionDTO) {
+    // Validações e regras de negócio
+    const transaction = await this.repository.create(data);
+
+    // Emitir evento
+    await eventBus.publish('TRANSACTION_CREATED', transaction);
+
+    return transaction;
+  }
+}
+
+// PROJECTIONS (atualizam read models)
+class TransactionProjection {
+  async onTransactionCreated(event: TransactionCreatedEvent) {
+    // Atualizar read model otimizado
+    await redis.set(`transaction:${event.transactionId}`, JSON.stringify(event));
+
+    // Atualizar agregações
+    await this.updateMonthlyReport(event.userId, event.date);
+  }
+}
+
+// READ MODEL
+class GetTransactionsQuery {
+  async execute(userId: string) {
+    // Buscar de read model otimizado (cache, materialized view, etc)
+    return await redis.get(`user:${userId}:transactions`);
+  }
+}
+```
+
+---
+
+### Exemplo Completo: FinTrack com EDA
+
+```typescript
+// 1. CRIAR TRANSAÇÃO (publica evento)
+class TransactionService {
+  async create(data: CreateTransactionDTO) {
+    const transaction = await this.repository.create(data);
+
+    await eventBus.publish(TRANSACTION_EVENTS.CREATED, {
+      transactionId: transaction.id,
+      userId: transaction.userId,
+      accountId: transaction.accountId,
+      amount: transaction.amount,
+      type: transaction.type,
+    });
+
+    return transaction;
+  }
+}
+
+// 2. MÚLTIPLOS LISTENERS RESPONDEM
+// Listener 1: Atualizar saldo da conta
+class AccountBalanceListener {
+  async onTransactionCreated(event) {
+    await this.accountService.updateBalance(event.accountId, event.amount, event.type);
+  }
+}
+
+// Listener 2: Enviar notificação
+class NotificationListener {
+  async onTransactionCreated(event) {
+    await this.notificationService.create({
+      userId: event.userId,
+      message: `Nova transação de R$ ${event.amount}`,
+    });
+  }
+}
+
+// Listener 3: Atualizar estatísticas
+class StatsListener {
+  async onTransactionCreated(event) {
+    await this.statsService.updateMonthlyStats(event.userId, event.amount);
+  }
+}
+
+// Listener 4: Verificar metas
+class GoalListener {
+  async onTransactionCreated(event) {
+    await this.goalService.checkProgress(event.userId, event.category, event.amount);
+  }
+}
+
+// ✅ TODOS executam automaticamente, sem TransactionService saber deles!
+```
+
+---
+
+### Boas Práticas
+
+**1. Idempotência**
+```typescript
+// Processar mesmo evento múltiplas vezes = mesmo resultado
+async function handleEvent(event) {
+  // Verificar se já foi processado
+  const processed = await redis.get(`event:${event.id}:processed`);
+  if (processed) {
+    console.log('Event already processed, skipping');
+    return;
+  }
+
+  // Processar
+  await doSomething(event);
+
+  // Marcar como processado
+  await redis.set(`event:${event.id}:processed`, 'true', 'EX', 86400);
+}
+```
+
+**2. Retry com Backoff Exponencial**
+```typescript
+async function handleEventWithRetry(event, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await processEvent(event);
+      return; // Sucesso
+    } catch (error) {
+      if (attempt === maxRetries) {
+        // Enviar para Dead Letter Queue
+        await dlq.send(event);
+        throw error;
+      }
+
+      // Aguardar antes de retry (exponencial: 1s, 2s, 4s...)
+      await sleep(Math.pow(2, attempt) * 1000);
+    }
+  }
+}
+```
+
+**3. Correlation ID**
+```typescript
+// Rastrear eventos relacionados
+const event = {
+  type: 'TRANSACTION_CREATED',
+  data: { ... },
+  metadata: {
+    correlationId: 'req-abc-123', // ← Mesmo ID para toda a cadeia
+    causationId: 'evt-001',       // ← Evento que causou este
+  },
+};
+```
+
+---
+
+### Ferramentas Populares
+
+- **In-Memory:** Node.js EventEmitter
+- **Distributed:** Redis Pub/Sub, RabbitMQ, Apache Kafka
+- **Managed Services:** AWS SQS/SNS, Google Pub/Sub, Azure Service Bus
+- **Event Sourcing:** EventStore, Axon Framework
+- **CQRS:** MediatR, NestJS CQRS
+
+---
+
+### Quando Usar no FinTrack?
+
+**Cenários:**
+- ✅ Criar transação → Atualizar saldo, enviar notificação, verificar metas
+- ✅ Múltiplos efeitos colaterais independentes
+- ✅ Auditoria completa (Event Sourcing)
+- ✅ Integração com outros sistemas
+
+**Alternativa (atual):**
+- ✅ Para projetos pequenos, use **Background Jobs** (BullMQ) como já implementado
+- ✅ Event-Driven adiciona complexidade, use quando realmente necessário
+
+---
+
 ## Checklist de Conhecimentos
 
 - [ ] Entender Layered Architecture
@@ -1895,6 +2665,11 @@ app.post('/api/transacoes', (req, res, next) =>
 - [ ] Separação de responsabilidades
 - [ ] Testabilidade do código
 - [ ] Escalabilidade da arquitetura
+- [ ] Event-Driven Architecture (EDA)
+- [ ] Event Bus e Message Brokers
+- [ ] Event Sourcing
+- [ ] CQRS (Command Query Responsibility Segregation)
+- [ ] Idempotência e retry strategies
 
 ---
 

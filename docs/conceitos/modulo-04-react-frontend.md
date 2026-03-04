@@ -1539,6 +1539,415 @@ const DashboardProtegido = comAutenticacao(Dashboard);
 
 ---
 
+## Microfrontends
+
+### O que são Microfrontends?
+
+Microfrontends são uma abordagem arquitetural onde uma aplicação frontend é dividida em **aplicações menores e independentes**, cada uma responsável por uma feature ou domínio de negócio.
+
+```
+APLICAÇÃO MONOLÍTICA (Tradicional)
+┌─────────────────────────────────────────┐
+│                                         │
+│    Aplicação React Única (Bundle)       │
+│                                         │
+│  - Header                               │
+│  - Dashboard                            │
+│  - Transações                           │
+│  - Perfil                               │
+│  - Admin                                │
+│                                         │
+│  ❌ Tudo em um bundle                  │
+│  ❌ Deploy de tudo junto                │
+│  ❌ Difícil escalar times               │
+└─────────────────────────────────────────┘
+
+MICROFRONTENDS (Moderna)
+┌─────────────────────────────────────────┐
+│  App Shell (Container)                  │
+├─────────────────────────────────────────┤
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│ │  Header  │ │Dashboard │ │Transações│ │
+│ │  (MFE 1) │ │ (MFE 2)  │ │ (MFE 3)  │ │
+│ └──────────┘ └──────────┘ └──────────┘ │
+│ ┌──────────┐ ┌──────────┐              │
+│ │  Perfil  │ │  Admin   │              │
+│ │  (MFE 4) │ │ (MFE 5)  │              │
+│ └──────────┘ └──────────┘              │
+│                                         │
+│  ✅ Bundles separados                  │
+│  ✅ Deploy independente                 │
+│  ✅ Times autônomos                     │
+└─────────────────────────────────────────┘
+```
+
+### Por que Microfrontends?
+
+**Benefícios:**
+- ✅ **Deploy independente** - Atualizar uma feature sem rebuild de tudo
+- ✅ **Times autônomos** - Cada time cuida de seu microfrontend
+- ✅ **Tecnologias diferentes** - MFE1 em React, MFE2 em Vue (se necessário)
+- ✅ **Escalabilidade** - Carregar apenas o necessário
+- ✅ **Isolamento de falhas** - Erro em um MFE não quebra outros
+
+**Quando usar:**
+- ✅ Aplicações grandes com múltiplos times
+- ✅ Diferentes ciclos de release por feature
+- ✅ Migração gradual de tecnologias
+
+**Quando NÃO usar:**
+- ❌ Aplicações pequenas/médias
+- ❌ Time único pequeno
+- ❌ Complexidade adicional não justificada
+
+---
+
+### Abordagens de Implementação
+
+#### 1. Module Federation (Webpack 5)
+
+**Melhor para:** Compartilhar código entre aplicações React em runtime
+
+```javascript
+// app-shell/webpack.config.js (Container)
+const ModuleFederationPlugin = require('webpack/lib/container/ModuleFederationPlugin');
+
+module.exports = {
+  plugins: [
+    new ModuleFederationPlugin({
+      name: 'shell',
+      remotes: {
+        dashboard: 'dashboard@http://localhost:3001/remoteEntry.js',
+        transactions: 'transactions@http://localhost:3002/remoteEntry.js',
+      },
+      shared: {
+        react: { singleton: true },
+        'react-dom': { singleton: true },
+      },
+    }),
+  ],
+};
+
+// dashboard/webpack.config.js (Remote)
+new ModuleFederationPlugin({
+  name: 'dashboard',
+  filename: 'remoteEntry.js',
+  exposes: {
+    './Dashboard': './src/Dashboard',
+  },
+  shared: {
+    react: { singleton: true },
+    'react-dom': { singleton: true },
+  },
+});
+```
+
+```javascript
+// app-shell/src/App.tsx
+import React, { lazy, Suspense } from 'react';
+
+// Importa microfrontend remotamente
+const Dashboard = lazy(() => import('dashboard/Dashboard'));
+const Transactions = lazy(() => import('transactions/TransactionList'));
+
+function App() {
+  return (
+    <div>
+      <Header />
+      <Suspense fallback={<div>Carregando...</div>}>
+        <Dashboard />
+        <Transactions />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+---
+
+#### 2. Single-SPA (Framework Agnostic)
+
+**Melhor para:** Integrar React + Vue + Angular juntos
+
+```bash
+npm install single-spa single-spa-react
+```
+
+```javascript
+// root-config.js
+import { registerApplication, start } from 'single-spa';
+
+registerApplication({
+  name: '@fintrack/dashboard',
+  app: () => System.import('@fintrack/dashboard'),
+  activeWhen: ['/dashboard'],
+});
+
+registerApplication({
+  name: '@fintrack/transactions',
+  app: () => System.import('@fintrack/transactions'),
+  activeWhen: ['/transactions'],
+});
+
+start();
+```
+
+```javascript
+// dashboard/src/root.component.tsx
+import React from 'react';
+import ReactDOM from 'react-dom';
+import singleSpaReact from 'single-spa-react';
+import Dashboard from './Dashboard';
+
+const lifecycles = singleSpaReact({
+  React,
+  ReactDOM,
+  rootComponent: Dashboard,
+  errorBoundary(err, info, props) {
+    return <div>Erro no Dashboard: {err.message}</div>;
+  },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;
+```
+
+---
+
+#### 3. iFrame (Mais Simples)
+
+**Melhor para:** Isolamento total, aplicações legadas
+
+```javascript
+// Shell.tsx
+function Shell() {
+  return (
+    <div>
+      <Header />
+      <iframe
+        src="https://dashboard.fintrack.com"
+        title="Dashboard"
+        width="100%"
+        height="600px"
+      />
+      <iframe
+        src="https://transactions.fintrack.com"
+        title="Transactions"
+        width="100%"
+        height="600px"
+      />
+    </div>
+  );
+}
+```
+
+**Vantagens:**
+- ✅ Isolamento completo (CSS, JS)
+- ✅ Fácil de implementar
+
+**Desvantagens:**
+- ❌ Performance (múltiplas páginas carregando)
+- ❌ Comunicação complexa (postMessage)
+- ❌ SEO ruim
+
+---
+
+### Comunicação entre Microfrontends
+
+#### 1. Custom Events (Browser Native)
+
+```javascript
+// transactions/src/TransactionCreated.tsx
+function TransactionCreated() {
+  const handleCreate = (transaction) => {
+    // Dispara evento customizado
+    window.dispatchEvent(
+      new CustomEvent('transaction:created', {
+        detail: { transaction },
+      })
+    );
+  };
+}
+
+// dashboard/src/Dashboard.tsx
+function Dashboard() {
+  useEffect(() => {
+    const handleTransactionCreated = (event) => {
+      console.log('Nova transação:', event.detail.transaction);
+      // Atualizar dashboard
+    };
+
+    window.addEventListener('transaction:created', handleTransactionCreated);
+
+    return () => {
+      window.removeEventListener('transaction:created', handleTransactionCreated);
+    };
+  }, []);
+}
+```
+
+---
+
+#### 2. Shared State (Zustand, Redux)
+
+```javascript
+// shared/store/authStore.ts (compartilhado entre MFEs)
+import create from 'zustand';
+
+export const useAuthStore = create((set) => ({
+  user: null,
+  login: (user) => set({ user }),
+  logout: () => set({ user: null }),
+}));
+
+// dashboard/src/Dashboard.tsx
+import { useAuthStore } from '@fintrack/shared-store';
+
+function Dashboard() {
+  const user = useAuthStore((state) => state.user);
+  return <div>Bem-vindo, {user?.name}</div>;
+}
+
+// transactions/src/Transactions.tsx
+import { useAuthStore } from '@fintrack/shared-store';
+
+function Transactions() {
+  const user = useAuthStore((state) => state.user);
+  // Mesmo estado compartilhado
+}
+```
+
+---
+
+#### 3. Props/Callbacks (Mais Direto)
+
+```javascript
+// shell/src/App.tsx
+function App() {
+  const [user, setUser] = useState(null);
+
+  return (
+    <div>
+      <Dashboard user={user} />
+      <Transactions user={user} onUpdate={(data) => console.log(data)} />
+    </div>
+  );
+}
+```
+
+---
+
+### Exemplo Prático: FinTrack com Microfrontends
+
+```
+fintrack/
+├── packages/
+│   ├── shell/                    ← Container principal
+│   │   ├── src/
+│   │   │   ├── App.tsx
+│   │   │   └── routes.tsx
+│   │   └── webpack.config.js
+│   │
+│   ├── mfe-dashboard/            ← Microfrontend 1
+│   │   ├── src/
+│   │   │   ├── Dashboard.tsx
+│   │   │   └── index.ts
+│   │   └── webpack.config.js
+│   │
+│   ├── mfe-transactions/         ← Microfrontend 2
+│   │   ├── src/
+│   │   │   ├── TransactionList.tsx
+│   │   │   └── index.ts
+│   │   └── webpack.config.js
+│   │
+│   ├── mfe-goals/                ← Microfrontend 3
+│   │   ├── src/
+│   │   │   ├── GoalsList.tsx
+│   │   │   └── index.ts
+│   │   └── webpack.config.js
+│   │
+│   └── shared/                   ← Código compartilhado
+│       ├── components/           ← Componentes comuns
+│       ├── store/                ← Estado global
+│       └── types/                ← TypeScript types
+│
+├── package.json                  ← Monorepo config
+└── lerna.json / pnpm-workspace.yaml
+```
+
+---
+
+### Boas Práticas
+
+**1. Shared Dependencies**
+```javascript
+// Sempre compartilhe React/ReactDOM para evitar múltiplas instâncias
+shared: {
+  react: { singleton: true, requiredVersion: '^18.0.0' },
+  'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
+}
+```
+
+**2. Design System Compartilhado**
+```javascript
+// Todos os MFEs usam mesmos componentes
+import { Button, Input } from '@fintrack/design-system';
+```
+
+**3. Error Boundaries**
+```javascript
+// Shell.tsx - Isolar falhas
+function Shell() {
+  return (
+    <ErrorBoundary fallback={<div>Erro no módulo</div>}>
+      <Suspense fallback={<Loading />}>
+        <RemoteComponent />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+```
+
+**4. Versionamento**
+```javascript
+// Sempre versione MFEs
+remotes: {
+  dashboard: 'dashboard@http://cdn.fintrack.com/dashboard/v2.3.1/remoteEntry.js',
+}
+```
+
+**5. Testes Isolados**
+```bash
+# Cada MFE tem seus próprios testes
+packages/mfe-dashboard/   → npm test
+packages/mfe-transactions/ → npm test
+```
+
+---
+
+### Ferramentas Recomendadas
+
+- **Module Federation** - Webpack 5 nativo
+- **Single-SPA** - Framework agnostic
+- **Nx** - Monorepo com microfrontends
+- **Turborepo** - Build system para monorepos
+- **pnpm workspaces** - Gerenciar múltiplos packages
+
+---
+
+### Quando Usar no FinTrack?
+
+**Cenários:**
+- ✅ Equipe cresceu para 10+ desenvolvedores
+- ✅ Features muito independentes (Dashboard, Admin, Reports)
+- ✅ Necessidade de deploy independente
+- ✅ Integração com sistemas legados
+
+**Alternativa (atual):**
+- ❌ Para projetos pequenos/médios, use **Code Splitting** e **Lazy Loading** (já implementado no FinTrack)
+- ❌ Mantém simplicidade sem complexidade de microfrontends
+
+---
+
 ## Checklist de Conhecimentos
 
 - [ ] JSX e renderização básica
@@ -1559,6 +1968,8 @@ const DashboardProtegido = comAutenticacao(Dashboard);
 - [ ] Compound Components pattern
 - [ ] Tratamento de erros
 - [ ] Testing React components
+- [ ] Microfrontends (Module Federation, Single-SPA)
+- [ ] Comunicação entre microfrontends
 
 ---
 

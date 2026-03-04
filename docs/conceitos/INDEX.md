@@ -34,9 +34,9 @@ Esta pasta contém **11 módulos técnicos abrangentes** (~16.000+ linhas) que c
 | 1 | **JavaScript/TypeScript** | **10.926** | **22** | Event Loop, Data Structures, Error Handling, Debugging, Dates, Regex, Auth, API Design, Estado Global, Advanced TS, Performance, Web APIs, **Data Structures & Algorithms** |
 | 2 | HTTP e Web | 908 | 8 | Protocol, Request/Response, REST, AJAX, CORS |
 | 3 | Node.js Backend | 1.320 | 10 | Express, Middleware, Prisma, Validação |
-| 4 | React Frontend | 1.567 | 12 | Hooks (10), Router, Forms, State Mgmt |
+| 4 | React Frontend | ~2.000 | 13 | Hooks (10), Router, Forms, State Mgmt, **Microfrontends** |
 | 5 | SQL Database | 1.088 | 9 | CRUD, JOINs, Agregações, Otimização |
-| 6 | Arquitetura | 1.238 | 8 | SOLID, Patterns, DDD, Clean Arch, DI |
+| 6 | Arquitetura | ~2.500 | 9 | SOLID, Patterns, DDD, Clean Arch, DI, **Event-Driven**, **CQRS** |
 | 7 | Segurança | 980 | 10 | OWASP, JWT, Bcrypt, Rate Limit, CORS |
 | 8 | Testes | 946 | 9 | Jest, Supertest, Playwright, TDD, Mocks |
 | 9 | DevOps | 793 | 8 | Docker, CI/CD, Cloud, Logging, Monitoring |
