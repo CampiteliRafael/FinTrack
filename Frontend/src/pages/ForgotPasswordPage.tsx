@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
-import { authService } from '../features/auth/services/authService';
+import { useAuth } from '../features/auth/contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
@@ -14,6 +14,7 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordPage() {
+  const { forgotPassword } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,7 +29,7 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     try {
       setError('');
-      await authService.forgotPassword(data.email);
+      await forgotPassword(data.email);
       setSubmitted(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao processar solicitação');

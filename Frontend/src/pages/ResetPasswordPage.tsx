@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { authService } from '../features/auth/services/authService';
+import { useAuth } from '../features/auth/contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { PasswordRequirements } from '../components/ui/PasswordRequirements';
@@ -23,6 +23,7 @@ const resetPasswordSchema = z
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
+  const { resetPassword } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState('');
@@ -49,7 +50,7 @@ export default function ResetPasswordPage() {
 
     try {
       setError('');
-      await authService.resetPassword(token, data.newPassword);
+      await resetPassword(token, data.newPassword);
       setSuccess(true);
 
       // Redirecionar para login após 3 segundos

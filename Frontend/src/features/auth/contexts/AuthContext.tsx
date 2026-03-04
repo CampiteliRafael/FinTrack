@@ -11,6 +11,8 @@ interface AuthContextData {
   register: (data: RegisterDTO) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
+  forgotPassword: (email: string) => Promise<{ message: string }>;
+  resetPassword: (token: string, newPassword: string) => Promise<{ message: string }>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -78,15 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(data: RegisterDTO) {
-    const response = await requestWithColdStartRetry(
+    await requestWithColdStartRetry(
       () => authService.register(data),
       () => {
         toast.info('Servidor iniciando, aguarde...');
       }
     );
-    sessionStorage.setItem('accessToken', response.accessToken);
-    sessionStorage.setItem('refreshToken', response.refreshToken);
-    setUser(response.user);
+    // Não faz login automático - usuário deve fazer login manualmente
   }
 
   async function logout() {
@@ -107,8 +107,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser);
   }
 
+  async function forgotPassword(email: string) {
+    return await requestWithColdStartRetry(
+      () => authService.forgotPassword(email),
+      () => {
+        toast.info('Servidor iniciando, aguarde...');
+      }
+    );
+  }
+
+  async function resetPassword(token: string, newPassword: string) {
+    return await requestWithColdStartRetry(
+      () => authService.resetPassword(token, newPassword),
+      () => {
+        toast.info('Servidor iniciando, aguarde...');
+      }
+    );
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, forgotPassword, resetPassword }}>
       {children}
       {wakeUpMessage && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">

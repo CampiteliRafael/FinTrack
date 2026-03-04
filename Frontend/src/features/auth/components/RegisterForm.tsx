@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { PasswordInput } from '../../../components/ui/PasswordInput';
@@ -21,6 +21,7 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
+  const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const { success, error: showErrorToast } = useToast();
 
@@ -39,7 +40,7 @@ export function RegisterForm() {
 
   async function onSubmit(data: RegisterFormData) {
     try {
-      await authService.register(data);
+      await registerUser(data);
       success('Conta criada com sucesso! Faça login para continuar.');
       navigate('/login');
     } catch (err: any) {
