@@ -765,7 +765,7 @@ http://localhost:4000/api/v1
 ### System Endpoints
 | Método | Endpoint | Descrição | Auth |
 |--------|----------|-----------|------|
-| GET | `/health` | Health check | Não |
+| GET | `/api/v1/health` | Health check | Não |
 | GET | `/api-docs` | Swagger UI | Não |
 
 ---
@@ -1943,7 +1943,7 @@ volumes:
 ### Health Check
 
 ```
-GET /health
+GET /api/v1/health
 ```
 
 **Resposta:**
@@ -2024,7 +2024,7 @@ refactor: melhora performance do dashboard
 Para dúvidas ou problemas, consulte:
 - Documentação da API: http://localhost:4000/api-docs
 - Logs do sistema: `logs/`
-- Health check: http://localhost:4000/health
+- Health check: http://localhost:4000/api/v1/health
 
 ---
 

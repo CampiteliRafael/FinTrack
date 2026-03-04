@@ -9,7 +9,7 @@ app.listen(PORT, () => {
   logInfo('Server started successfully', {
     port: PORT,
     environment: env.NODE_ENV,
-    healthCheck: `http://localhost:${PORT}/health`,
+    healthCheck: `http://localhost:${PORT}/api/v1/health`,
   });
 
   if (env.NODE_ENV === 'development') {

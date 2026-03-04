@@ -47,10 +47,6 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(globalLimiter);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
@@ -63,6 +59,10 @@ app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/installments', installmentRoutes);
 app.use('/api/v1/queues', queueRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+
+app.get('/api/v1/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 app.use(errorHandler);
 
