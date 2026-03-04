@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../../features/auth/contexts/AuthContext';
+import { ToastProvider } from '../../contexts/ToastContext';
 import { ReactNode } from 'react';
 
 vi.mock('../../services/api', () => ({
@@ -10,7 +11,11 @@ vi.mock('../../services/api', () => ({
   },
 }));
 
-const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <ToastProvider>
+    <AuthProvider>{children}</AuthProvider>
+  </ToastProvider>
+);
 
 describe('useAuth Hook', () => {
   beforeEach(() => {

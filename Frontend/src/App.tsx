@@ -63,7 +63,6 @@ function App() {
                   <GoalProvider>
                     <InstallmentProvider>
                       <Routes>
-                        {/* Public Routes with PublicLayout */}
                         <Route
                           path="/"
                           element={
