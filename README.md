@@ -8,7 +8,7 @@
 
 **Sistema completo de gestão financeira pessoal com recursos avançados de planejamento e controle**
 
-[🚀 Demo ao Vivo](https://fintrack.vercel.app) • [📚 API Docs](https://fintrack-9iaq.onrender.com/api-docs) • [📖 Documentação Técnica](#documentação-técnica)
+[🚀 Demo ao Vivo](https://fintrack-nu-cyan.vercel.app/) • [📚 API Docs](https://fintrack-9iaq.onrender.com/api-docs) • [📖 Documentação Técnica](#documentação-técnica)
 
 </div>
 
@@ -294,18 +294,6 @@ O backend foi completamente migrado para seguir os princípios da **Clean Archit
 
 ---
 
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Este é um projeto de portfólio, mas feedbacks e sugestões são sempre apreciados.
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
----
-
 ## 📝 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
@@ -317,23 +305,12 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 **Rafael Campiteli**
 
 - GitHub: [@CampiteliRafael](https://github.com/CampiteliRafael)
-- LinkedIn: [Rafael Campiteli](https://www.linkedin.com/in/rafael-campiteli)
-- Portfolio: [em breve]
-
----
-
-## 🙏 Agradecimentos
-
-- Inspiração em diversas ferramentas de gestão financeira
-- Comunidade open-source por todas as bibliotecas utilizadas
-- Feedback de usuários que ajudaram a melhorar o projeto
+- LinkedIn: [Rafael Campiteli](https://www.linkedin.com/in/rafael-campiteli-pereira-033537240/)
 
 ---
 
 <div align="center">
 
 **Feito com ❤️ e TypeScript**
-
-⭐ Se este projeto te ajudou, considere dar uma estrela!
 
 </div>
