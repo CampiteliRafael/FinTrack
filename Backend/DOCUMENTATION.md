@@ -3061,8 +3061,6 @@ Crie `.vscode/launch.json`:
 
 ---
 
-## 🤝 Contribuindo
-
 ### Padrões de Código
 
 - **ESLint** - Linting
@@ -3081,8 +3079,6 @@ refactor: melhora performance do dashboard
 ```
 
 ---
-
-## 📞 Suporte
 
 Para dúvidas ou problemas, consulte:
 - Documentação da API: http://localhost:4000/api-docs
