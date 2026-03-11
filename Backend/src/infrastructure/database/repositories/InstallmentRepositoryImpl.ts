@@ -1,15 +1,12 @@
-import prisma from '../../config/database';
-import {
-  IInstallment,
-  CreateInstallmentData,
-  UpdateInstallmentData,
-  InstallmentFilters,
-} from './installment.types';
+import prisma from '../../../config/database';
+import { IInstallmentRepository, InstallmentFilters } from '../../../core/interfaces/IInstallmentRepository';
+import { Installment } from '../../../core/entities/Installment';
+import { InstallmentMapper } from '../mappers/InstallmentMapper';
 import { v4 as uuidv4 } from 'uuid';
 
-export class InstallmentRepository {
-  async findById(id: string, userId: string): Promise<IInstallment | null> {
-    const installment = await prisma.installment.findFirst({
+export class InstallmentRepositoryImpl implements IInstallmentRepository {
+  async findById(id: string, userId: string): Promise<Installment | null> {
+    const raw = await prisma.installment.findFirst({
       where: {
         id,
         userId,
@@ -22,19 +19,13 @@ export class InstallmentRepository {
       },
     });
 
-    if (!installment) return null;
-
-    return {
-      ...installment,
-      totalAmount: installment.totalAmount.toNumber(),
-      transactionId: installment.transactionId ?? undefined,
-    };
+    return raw ? InstallmentMapper.toDomain(raw) : null;
   }
 
   async findAll(
     userId: string,
     filters: InstallmentFilters
-  ): Promise<{ installments: IInstallment[]; total: number }> {
+  ): Promise<{ installments: Installment[]; total: number }> {
     const { accountId, categoryId, completed, page = 1, limit = 20 } = filters;
     const skip = (page - 1) * limit;
 
@@ -86,26 +77,24 @@ export class InstallmentRepository {
     ]);
 
     return {
-      installments: installments.map((inst) => ({
-        ...inst,
-        totalAmount: inst.totalAmount.toNumber(),
-        transactionId: inst.transactionId ?? undefined,
-      })),
+      installments: installments.map(InstallmentMapper.toDomain),
       total,
     };
   }
 
-  async create(userId: string, data: CreateInstallmentData): Promise<IInstallment> {
-    const installment = await prisma.installment.create({
+  async create(installment: Omit<Installment, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Installment> {
+    const raw = await prisma.installment.create({
       data: {
         id: uuidv4(),
-        userId,
-        description: data.description,
-        totalAmount: data.totalAmount,
-        installments: data.installments,
-        accountId: data.accountId,
-        categoryId: data.categoryId,
-        startDate: data.startDate,
+        userId: installment.userId,
+        transactionId: installment.transactionId,
+        description: installment.description,
+        totalAmount: installment.totalAmount,
+        installments: installment.installments,
+        currentInstallment: installment.currentInstallment,
+        accountId: installment.accountId,
+        categoryId: installment.categoryId,
+        startDate: installment.startDate,
       },
       include: {
         account: true,
@@ -113,18 +102,14 @@ export class InstallmentRepository {
       },
     });
 
-    return {
-      ...installment,
-      totalAmount: installment.totalAmount.toNumber(),
-      transactionId: installment.transactionId ?? undefined,
-    };
+    return InstallmentMapper.toDomain(raw);
   }
 
   async update(
     id: string,
     userId: string,
-    data: UpdateInstallmentData
-  ): Promise<IInstallment | null> {
+    data: Partial<Installment>
+  ): Promise<Installment | null> {
     const result = await prisma.installment.updateMany({
       where: {
         id,
@@ -132,7 +117,10 @@ export class InstallmentRepository {
         deletedAt: null,
       },
       data: {
-        ...data,
+        ...(data.description && { description: data.description }),
+        ...(data.currentInstallment !== undefined && { currentInstallment: data.currentInstallment }),
+        ...(data.accountId && { accountId: data.accountId }),
+        ...(data.categoryId && { categoryId: data.categoryId }),
         updatedAt: new Date(),
       },
     });
@@ -157,7 +145,7 @@ export class InstallmentRepository {
     return result.count > 0;
   }
 
-  async incrementInstallment(id: string, userId: string): Promise<IInstallment | null> {
+  async incrementInstallment(id: string, userId: string): Promise<Installment | null> {
     const installment = await this.findById(id, userId);
     if (!installment) return null;
 

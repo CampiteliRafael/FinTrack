@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AccountRepository } from './account.repository';
+import { AccountRepositoryImpl } from '../../infrastructure/database/repositories/AccountRepositoryImpl';
 import { AccountService } from './account.service';
 import { AccountController } from './account.controller';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
@@ -9,7 +9,7 @@ import { uuidParamSchema } from '../../shared/validators/query.validator';
 
 const router = Router();
 
-const accountRepository = new AccountRepository();
+const accountRepository = new AccountRepositoryImpl();
 const accountService = new AccountService(accountRepository);
 const accountController = new AccountController(accountService);
 

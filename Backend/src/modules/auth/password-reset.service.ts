@@ -79,10 +79,7 @@ export class PasswordResetService {
       throw new UnauthorizedError('Reset token expired');
     }
 
-    // ✅ Usar HashUtil ao invés de bcrypt direto
     const passwordHash = await HashUtil.hash(newPassword);
-
-    // Atualizar senha e marcar token como usado
     await prisma.$transaction([
       prisma.user.update({
         where: { id: resetToken.userId },

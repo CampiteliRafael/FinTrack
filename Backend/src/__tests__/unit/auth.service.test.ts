@@ -1,6 +1,6 @@
 import { AuthService } from '../../modules/auth/auth.service';
-import { UserRepository } from '../../modules/users/user.repository';
-import { RefreshTokenRepository } from '../../modules/auth/refresh-token.repository';
+import { IUserRepository } from '../../core/interfaces/IUserRepository';
+import { IRefreshTokenRepository } from '../../core/interfaces/IRefreshTokenRepository';
 import { HashUtil } from '../../shared/utils/hash.util';
 import { JwtUtil } from '../../shared/utils/jwt.util';
 import { notificationService } from '../../modules/notifications/notification.service';
@@ -8,8 +8,6 @@ import { UnauthorizedError, ConflictError, NotFoundError } from '../../shared/er
 import { NotificationType } from '../../modules/notifications/notification.types';
 
 // Mock dependencies
-jest.mock('../../modules/users/user.repository');
-jest.mock('../../modules/auth/refresh-token.repository');
 jest.mock('../../shared/utils/hash.util');
 jest.mock('../../shared/utils/jwt.util');
 jest.mock('../../modules/notifications/notification.service');
@@ -19,12 +17,26 @@ jest.mock('../../config/logger', () => ({
 
 describe('AuthService', () => {
   let authService: AuthService;
-  let mockUserRepository: jest.Mocked<UserRepository>;
-  let mockRefreshTokenRepository: jest.Mocked<RefreshTokenRepository>;
+  let mockUserRepository: jest.Mocked<IUserRepository>;
+  let mockRefreshTokenRepository: jest.Mocked<IRefreshTokenRepository>;
 
   beforeEach(() => {
-    mockUserRepository = new UserRepository() as jest.Mocked<UserRepository>;
-    mockRefreshTokenRepository = new RefreshTokenRepository() as jest.Mocked<RefreshTokenRepository>;
+    mockUserRepository = {
+      findByEmail: jest.fn(),
+      findById: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updatePassword: jest.fn(),
+    } as jest.Mocked<IUserRepository>;
+
+    mockRefreshTokenRepository = {
+      create: jest.fn(),
+      findByToken: jest.fn(),
+      deleteByToken: jest.fn(),
+      deleteAllByUserId: jest.fn(),
+      deleteExpired: jest.fn(),
+    } as jest.Mocked<IRefreshTokenRepository>;
+
     authService = new AuthService(mockUserRepository, mockRefreshTokenRepository);
   });
 

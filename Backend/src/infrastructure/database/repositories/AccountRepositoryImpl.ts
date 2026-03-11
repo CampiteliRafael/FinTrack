@@ -56,4 +56,77 @@ export class AccountRepositoryImpl implements IAccountRepository {
       data: { deletedAt: new Date() },
     });
   }
+
+  async createWithInitialBalance(
+    account: Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>
+  ): Promise<Account> {
+    const raw = await prisma.$transaction(async (tx) => {
+      // 1. Criar a conta com saldo inicial
+      const createdAccount = await tx.account.create({
+        data: {
+          id: uuidv4(),
+          userId: account.userId,
+          name: account.name,
+          initialBalance: account.initialBalance,
+          currentBalance: account.initialBalance,
+          availableBalance: account.initialBalance,
+          reservedAmount: 0,
+          type: account.type,
+        },
+      });
+
+      // 2. Criar evento de saldo inicial se houver saldo
+      if (Number(account.initialBalance) !== 0) {
+        await tx.accountEvent.create({
+          data: {
+            accountId: createdAccount.id,
+            type: 'initial_balance',
+            amount: account.initialBalance,
+            description: 'Saldo inicial da conta',
+            balanceBefore: 0,
+            balanceAfter: account.initialBalance,
+          },
+        });
+      }
+
+      return createdAccount;
+    });
+
+    return AccountMapper.toDomain(raw);
+  }
+
+  async updateWithBalanceAdjustment(
+    id: string,
+    oldAccount: Account,
+    newBalance: number
+  ): Promise<Account> {
+    const raw = await prisma.$transaction(async (tx) => {
+      const balanceBefore = Number(oldAccount.initialBalance);
+      const balanceAfter = newBalance;
+      const adjustment = balanceAfter - balanceBefore;
+
+      // Criar evento de ajuste manual
+      await tx.accountEvent.create({
+        data: {
+          accountId: id,
+          type: 'adjustment',
+          amount: adjustment,
+          description: 'Ajuste manual de saldo',
+          balanceBefore,
+          balanceAfter,
+        },
+      });
+
+      // Atualizar saldo da conta
+      return tx.account.update({
+        where: { id },
+        data: {
+          currentBalance: balanceAfter,
+          availableBalance: balanceAfter,
+        },
+      });
+    });
+
+    return AccountMapper.toDomain(raw);
+  }
 }

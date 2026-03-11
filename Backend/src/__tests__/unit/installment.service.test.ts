@@ -1,26 +1,47 @@
 import { InstallmentService } from '../../modules/installments/installment.service';
-import { InstallmentRepository } from '../../modules/installments/installment.repository';
-import { AccountRepository } from '../../modules/accounts/account.repository';
-import { CategoryRepository } from '../../modules/categories/category.repository';
+import { IInstallmentRepository } from '../../core/interfaces/IInstallmentRepository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import { NotFoundError } from '../../shared/errors/AppError';
 import { ValidationUtil } from '../../shared/utils/validation.util';
 
 // Mock dependencies
-jest.mock('../../modules/installments/installment.repository');
-jest.mock('../../modules/accounts/account.repository');
-jest.mock('../../modules/categories/category.repository');
 jest.mock('../../shared/utils/validation.util');
 
 describe('InstallmentService', () => {
   let installmentService: InstallmentService;
-  let mockInstallmentRepository: jest.Mocked<InstallmentRepository>;
-  let mockAccountRepository: jest.Mocked<AccountRepository>;
-  let mockCategoryRepository: jest.Mocked<CategoryRepository>;
+  let mockInstallmentRepository: jest.Mocked<IInstallmentRepository>;
+  let mockAccountRepository: jest.Mocked<IAccountRepository>;
+  let mockCategoryRepository: jest.Mocked<ICategoryRepository>;
 
   beforeEach(() => {
-    mockInstallmentRepository = new InstallmentRepository() as jest.Mocked<InstallmentRepository>;
-    mockAccountRepository = new AccountRepository() as jest.Mocked<AccountRepository>;
-    mockCategoryRepository = new CategoryRepository() as jest.Mocked<CategoryRepository>;
+    mockInstallmentRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      incrementInstallment: jest.fn(),
+    } as jest.Mocked<IInstallmentRepository>;
+
+    mockAccountRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+      createWithInitialBalance: jest.fn(),
+      updateWithBalanceAdjustment: jest.fn(),
+    } as jest.Mocked<IAccountRepository>;
+
+    mockCategoryRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+    } as jest.Mocked<ICategoryRepository>;
+
     installmentService = new InstallmentService(
       mockInstallmentRepository,
       mockAccountRepository,
@@ -62,7 +83,17 @@ describe('InstallmentService', () => {
         createData.categoryId,
         userId
       );
-      expect(mockInstallmentRepository.create).toHaveBeenCalledWith(userId, createData);
+      expect(mockInstallmentRepository.create).toHaveBeenCalledWith({
+        userId,
+        transactionId: null,
+        description: createData.description,
+        totalAmount: createData.totalAmount,
+        installments: createData.installments,
+        currentInstallment: 0,
+        accountId: createData.accountId,
+        categoryId: createData.categoryId,
+        startDate: createData.startDate,
+      });
       expect(result).toEqual(mockInstallment);
     });
 

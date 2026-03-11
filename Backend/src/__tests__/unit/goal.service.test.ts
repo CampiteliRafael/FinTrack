@@ -1,25 +1,38 @@
 import { GoalService } from '../../modules/goals/goal.service';
-import { GoalRepository } from '../../modules/goals/goal.repository';
-import { CategoryRepository } from '../../modules/categories/category.repository';
+import { IGoalRepository } from '../../core/interfaces/IGoalRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import { notificationService } from '../../modules/notifications/notification.service';
 import { NotificationType } from '../../modules/notifications/notification.types';
 import { NotFoundError } from '../../shared/errors/AppError';
 import { ValidationUtil } from '../../shared/utils/validation.util';
 
 // Mock dependencies
-jest.mock('../../modules/goals/goal.repository');
-jest.mock('../../modules/categories/category.repository');
 jest.mock('../../modules/notifications/notification.service');
 jest.mock('../../shared/utils/validation.util');
 
 describe('GoalService', () => {
   let goalService: GoalService;
-  let mockGoalRepository: jest.Mocked<GoalRepository>;
-  let mockCategoryRepository: jest.Mocked<CategoryRepository>;
+  let mockGoalRepository: jest.Mocked<IGoalRepository>;
+  let mockCategoryRepository: jest.Mocked<ICategoryRepository>;
 
   beforeEach(() => {
-    mockGoalRepository = new GoalRepository() as jest.Mocked<GoalRepository>;
-    mockCategoryRepository = new CategoryRepository() as jest.Mocked<CategoryRepository>;
+    mockGoalRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      addProgress: jest.fn(),
+    } as jest.Mocked<IGoalRepository>;
+
+    mockCategoryRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+    } as jest.Mocked<ICategoryRepository>;
+
     goalService = new GoalService(mockGoalRepository, mockCategoryRepository);
   });
 
@@ -54,7 +67,14 @@ describe('GoalService', () => {
         createData.categoryId,
         userId
       );
-      expect(mockGoalRepository.create).toHaveBeenCalledWith(userId, createData);
+      expect(mockGoalRepository.create).toHaveBeenCalledWith({
+        userId,
+        name: createData.name,
+        targetAmount: createData.targetAmount,
+        currentAmount: 0,
+        deadline: createData.deadline,
+        categoryId: createData.categoryId,
+      });
       expect(result).toEqual(mockGoal);
     });
 

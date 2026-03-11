@@ -1,10 +1,12 @@
-import prisma from '../../config/database';
-import { IGoal, CreateGoalData, UpdateGoalData, GoalFilters } from './goal.types';
+import prisma from '../../../config/database';
+import { IGoalRepository, GoalFilters } from '../../../core/interfaces/IGoalRepository';
+import { Goal } from '../../../core/entities/Goal';
+import { GoalMapper } from '../mappers/GoalMapper';
 import { v4 as uuidv4 } from 'uuid';
 
-export class GoalRepository {
-  async findById(id: string, userId: string): Promise<IGoal | null> {
-    const goal = await prisma.goal.findFirst({
+export class GoalRepositoryImpl implements IGoalRepository {
+  async findById(id: string, userId: string): Promise<Goal | null> {
+    const raw = await prisma.goal.findFirst({
       where: {
         id,
         userId,
@@ -15,16 +17,10 @@ export class GoalRepository {
       },
     });
 
-    if (!goal) return null;
-
-    return {
-      ...goal,
-      targetAmount: goal.targetAmount.toNumber(),
-      currentAmount: goal.currentAmount.toNumber(),
-    };
+    return raw ? GoalMapper.toDomain(raw) : null;
   }
 
-  async findAll(userId: string, filters: GoalFilters): Promise<{ goals: IGoal[]; total: number }> {
+  async findAll(userId: string, filters: GoalFilters): Promise<{ goals: Goal[]; total: number }> {
     const { categoryId, completed, page = 1, limit = 20 } = filters;
     const skip = (page - 1) * limit;
 
@@ -69,51 +65,48 @@ export class GoalRepository {
     ]);
 
     return {
-      goals: goals.map((goal) => ({
-        ...goal,
-        targetAmount: goal.targetAmount.toNumber(),
-        currentAmount: goal.currentAmount.toNumber(),
-      })),
+      goals: goals.map(GoalMapper.toDomain),
       total,
     };
   }
 
-  async create(userId: string, data: CreateGoalData): Promise<IGoal> {
-    const goal = await prisma.goal.create({
+  async create(goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Goal> {
+    const raw = await prisma.goal.create({
       data: {
         id: uuidv4(),
-        userId,
-        name: data.name,
-        targetAmount: data.targetAmount,
-        deadline: data.deadline,
-        categoryId: data.categoryId,
+        userId: goal.userId,
+        name: goal.name,
+        targetAmount: goal.targetAmount,
+        currentAmount: goal.currentAmount,
+        deadline: goal.deadline,
+        categoryId: goal.categoryId,
       },
       include: {
         category: true,
       },
     });
 
-    return {
-      ...goal,
-      targetAmount: goal.targetAmount.toNumber(),
-      currentAmount: goal.currentAmount.toNumber(),
-    };
+    return GoalMapper.toDomain(raw);
   }
 
-  async update(id: string, userId: string, data: UpdateGoalData): Promise<IGoal | null> {
-    const goal = await prisma.goal.updateMany({
+  async update(id: string, userId: string, data: Partial<Goal>): Promise<Goal | null> {
+    const result = await prisma.goal.updateMany({
       where: {
         id,
         userId,
         deletedAt: null,
       },
       data: {
-        ...data,
+        ...(data.name && { name: data.name }),
+        ...(data.targetAmount !== undefined && { targetAmount: data.targetAmount }),
+        ...(data.currentAmount !== undefined && { currentAmount: data.currentAmount }),
+        ...(data.deadline !== undefined && { deadline: data.deadline }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
         updatedAt: new Date(),
       },
     });
 
-    if (goal.count === 0) return null;
+    if (result.count === 0) return null;
 
     return this.findById(id, userId);
   }
@@ -133,7 +126,7 @@ export class GoalRepository {
     return result.count > 0;
   }
 
-  async addProgress(id: string, userId: string, amount: number): Promise<IGoal | null> {
+  async addProgress(id: string, userId: string, amount: number): Promise<Goal | null> {
     const goal = await this.findById(id, userId);
     if (!goal) return null;
 

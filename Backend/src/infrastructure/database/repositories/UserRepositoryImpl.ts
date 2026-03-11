@@ -33,4 +33,22 @@ export class UserRepositoryImpl implements IUserRepository {
 
     return UserMapper.toDomain(raw);
   }
+
+  async update(id: string, data: Partial<Pick<User, 'name' | 'email'>>): Promise<User> {
+    const raw = await prisma.user.update({
+      where: { id },
+      data,
+    });
+
+    return UserMapper.toDomain(raw);
+  }
+
+  async updatePassword(id: string, passwordHash: string): Promise<User> {
+    const raw = await prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+    });
+
+    return UserMapper.toDomain(raw);
+  }
 }

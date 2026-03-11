@@ -1,16 +1,22 @@
 import { AccountService } from '../../modules/accounts/account.service';
-import { AccountRepository } from '../../modules/accounts/account.repository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
 import { NotFoundError } from '../../shared/errors/AppError';
-
-// Mock dependencies
-jest.mock('../../modules/accounts/account.repository');
 
 describe('AccountService', () => {
   let accountService: AccountService;
-  let mockAccountRepository: jest.Mocked<AccountRepository>;
+  let mockAccountRepository: jest.Mocked<IAccountRepository>;
 
   beforeEach(() => {
-    mockAccountRepository = new AccountRepository() as jest.Mocked<AccountRepository>;
+    mockAccountRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+      createWithInitialBalance: jest.fn(),
+      updateWithBalanceAdjustment: jest.fn(),
+    } as jest.Mocked<IAccountRepository>;
+
     accountService = new AccountService(mockAccountRepository);
   });
 
@@ -38,17 +44,15 @@ describe('AccountService', () => {
         reservedAmount: 0,
       };
 
-      mockAccountRepository.create.mockResolvedValue(mockAccount as any);
+      mockAccountRepository.createWithInitialBalance.mockResolvedValue(mockAccount as any);
 
       const result = await accountService.create(userId, createData);
 
-      expect(mockAccountRepository.create).toHaveBeenCalledWith({
+      expect(mockAccountRepository.createWithInitialBalance).toHaveBeenCalledWith({
+        userId,
         name: createData.name,
         initialBalance: createData.initialBalance,
         type: createData.type,
-        monthlyIncome: createData.monthlyIncome,
-        monthlyIncomeDay: createData.monthlyIncomeDay,
-        user: { connect: { id: userId } },
       });
 
       expect(result).toEqual(mockAccount);
@@ -64,14 +68,22 @@ describe('AccountService', () => {
 
       const mockAccount = {
         id: 'account-456',
-        ...dataWithoutMonthlyIncome,
-        userId,
+        name: dataWithoutMonthlyIncome.name,
+        initialBalance: dataWithoutMonthlyIncome.initialBalance,
         currentBalance: 500.00,
+        availableBalance: 500.00,
+        reservedAmount: 0,
+        type: dataWithoutMonthlyIncome.type,
+        userId,
         monthlyIncome: null,
         monthlyIncomeDay: null,
+        lastTransactionAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
       };
 
-      mockAccountRepository.create.mockResolvedValue(mockAccount as any);
+      mockAccountRepository.createWithInitialBalance.mockResolvedValue(mockAccount as any);
 
       const result = await accountService.create(userId, dataWithoutMonthlyIncome);
 
@@ -153,8 +165,18 @@ describe('AccountService', () => {
       const existingAccount = {
         id: accountId,
         name: 'Nubank',
+        initialBalance: 1000.00,
         currentBalance: 1000.00,
+        availableBalance: 1000.00,
+        reservedAmount: 0,
+        type: 'checking' as const,
         userId,
+        monthlyIncome: null,
+        monthlyIncomeDay: null,
+        lastTransactionAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
       };
 
       const updateData = {

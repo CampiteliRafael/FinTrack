@@ -1,21 +1,27 @@
-import prisma from '../../config/database';
-import { RefreshToken } from '@prisma/client';
+import prisma from '../../../config/database';
+import { IRefreshTokenRepository } from '../../../core/interfaces/IRefreshTokenRepository';
+import { RefreshToken } from '../../../core/entities/RefreshToken';
+import { RefreshTokenMapper } from '../mappers/RefreshTokenMapper';
 
-export class RefreshTokenRepository {
+export class RefreshTokenRepositoryImpl implements IRefreshTokenRepository {
   async create(userId: string, token: string, expiresAt: Date): Promise<RefreshToken> {
-    return prisma.refreshToken.create({
+    const raw = await prisma.refreshToken.create({
       data: {
         userId,
         token,
         expiresAt,
       },
     });
+
+    return RefreshTokenMapper.toDomain(raw);
   }
 
   async findByToken(token: string): Promise<RefreshToken | null> {
-    return prisma.refreshToken.findUnique({
+    const raw = await prisma.refreshToken.findUnique({
       where: { token },
     });
+
+    return raw ? RefreshTokenMapper.toDomain(raw) : null;
   }
 
   async deleteByToken(token: string): Promise<void> {

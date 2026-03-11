@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { InstallmentController } from './installment.controller';
 import { InstallmentService } from './installment.service';
-import { InstallmentRepository } from './installment.repository';
-import { AccountRepository } from '../accounts/account.repository';
-import { CategoryRepository } from '../categories/category.repository';
+import { InstallmentRepositoryImpl } from '../../infrastructure/database/repositories/InstallmentRepositoryImpl';
+import { AccountRepositoryImpl } from '../../infrastructure/database/repositories/AccountRepositoryImpl';
+import { CategoryRepositoryImpl } from '../../infrastructure/database/repositories/CategoryRepositoryImpl';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { validate, validateQuery, validateParams } from '../../shared/middlewares/validation.middleware';
 import { createInstallmentSchema, updateInstallmentSchema } from './installment.schemas';
@@ -11,9 +11,9 @@ import { installmentFiltersSchema, uuidParamSchema } from '../../shared/validato
 
 const router = Router();
 
-const installmentRepository = new InstallmentRepository();
-const accountRepository = new AccountRepository();
-const categoryRepository = new CategoryRepository();
+const installmentRepository = new InstallmentRepositoryImpl();
+const accountRepository = new AccountRepositoryImpl();
+const categoryRepository = new CategoryRepositoryImpl();
 const installmentService = new InstallmentService(
   installmentRepository,
   accountRepository,

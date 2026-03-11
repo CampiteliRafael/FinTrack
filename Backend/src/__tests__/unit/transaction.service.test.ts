@@ -1,26 +1,51 @@
 import { TransactionService } from '../../modules/transactions/transaction.service';
-import { TransactionRepository } from '../../modules/transactions/transaction.repository';
-import { AccountRepository } from '../../modules/accounts/account.repository';
-import { CategoryRepository } from '../../modules/categories/category.repository';
+import { ITransactionRepository } from '../../core/interfaces/ITransactionRepository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import { NotFoundError } from '../../shared/errors/AppError';
 import { ValidationUtil } from '../../shared/utils/validation.util';
 
 // Mock dependencies
-jest.mock('../../modules/transactions/transaction.repository');
-jest.mock('../../modules/accounts/account.repository');
-jest.mock('../../modules/categories/category.repository');
 jest.mock('../../shared/utils/validation.util');
 
 describe('TransactionService', () => {
   let transactionService: TransactionService;
-  let mockTransactionRepository: jest.Mocked<TransactionRepository>;
-  let mockAccountRepository: jest.Mocked<AccountRepository>;
-  let mockCategoryRepository: jest.Mocked<CategoryRepository>;
+  let mockTransactionRepository: jest.Mocked<ITransactionRepository>;
+  let mockAccountRepository: jest.Mocked<IAccountRepository>;
+  let mockCategoryRepository: jest.Mocked<ICategoryRepository>;
 
   beforeEach(() => {
-    mockTransactionRepository = new TransactionRepository() as jest.Mocked<TransactionRepository>;
-    mockAccountRepository = new AccountRepository() as jest.Mocked<AccountRepository>;
-    mockCategoryRepository = new CategoryRepository() as jest.Mocked<CategoryRepository>;
+    // Create complete mocks for interfaces
+    mockTransactionRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+      findByIdWithRelations: jest.fn(),
+      findAllWithRelations: jest.fn(),
+      createWithBalanceUpdate: jest.fn(),
+      updateWithBalanceUpdate: jest.fn(),
+      softDeleteWithBalanceUpdate: jest.fn(),
+    } as jest.Mocked<ITransactionRepository>;
+
+    mockAccountRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+      createWithInitialBalance: jest.fn(),
+      updateWithBalanceAdjustment: jest.fn(),
+    } as jest.Mocked<IAccountRepository>;
+
+    mockCategoryRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+    } as jest.Mocked<ICategoryRepository>;
 
     transactionService = new TransactionService(
       mockTransactionRepository,
@@ -158,6 +183,10 @@ describe('TransactionService', () => {
         id: 'account-123',
         currentBalance: 900.00,
       },
+      category: {
+        id: 'category-123',
+        name: 'Food',
+      },
     };
 
     it('should update transaction with balance recalculation when amount changes', async () => {
@@ -165,7 +194,7 @@ describe('TransactionService', () => {
         amount: 150.00, // Changed from 100 to 150
       };
 
-      mockTransactionRepository.findById.mockResolvedValue(oldTransaction as any);
+      mockTransactionRepository.findByIdWithRelations.mockResolvedValue(oldTransaction as any);
       mockTransactionRepository.updateWithBalanceUpdate.mockResolvedValue({
         ...oldTransaction,
         amount: 150.00,
@@ -177,7 +206,7 @@ describe('TransactionService', () => {
 
       const result = await transactionService.update(transactionId, userId, updateData);
 
-      expect(mockTransactionRepository.findById).toHaveBeenCalledWith(transactionId, userId);
+      expect(mockTransactionRepository.findByIdWithRelations).toHaveBeenCalledWith(transactionId, userId);
       expect(mockTransactionRepository.updateWithBalanceUpdate).toHaveBeenCalled();
       expect(result.amount).toBe(150.00);
     });
@@ -187,7 +216,7 @@ describe('TransactionService', () => {
         type: 'income' as const, // Changed from expense to income
       };
 
-      mockTransactionRepository.findById.mockResolvedValue(oldTransaction as any);
+      mockTransactionRepository.findByIdWithRelations.mockResolvedValue(oldTransaction as any);
       mockTransactionRepository.updateWithBalanceUpdate.mockResolvedValue({
         ...oldTransaction,
         type: 'income',
@@ -208,7 +237,7 @@ describe('TransactionService', () => {
         accountId: 'account-456', // Different account
       };
 
-      mockTransactionRepository.findById.mockResolvedValue(oldTransaction as any);
+      mockTransactionRepository.findByIdWithRelations.mockResolvedValue(oldTransaction as any);
       (ValidationUtil.validateAccount as jest.Mock).mockResolvedValue(undefined);
       mockTransactionRepository.updateWithBalanceUpdate.mockResolvedValue({
         ...oldTransaction,
@@ -230,7 +259,7 @@ describe('TransactionService', () => {
         description: 'Updated description',
       };
 
-      mockTransactionRepository.findById.mockResolvedValue(oldTransaction as any);
+      mockTransactionRepository.findByIdWithRelations.mockResolvedValue(oldTransaction as any);
       mockTransactionRepository.update.mockResolvedValue({
         ...oldTransaction,
         description: 'Updated description',
@@ -245,7 +274,7 @@ describe('TransactionService', () => {
     });
 
     it('should throw NotFoundError if transaction does not exist', async () => {
-      mockTransactionRepository.findById.mockResolvedValue(null);
+      mockTransactionRepository.findByIdWithRelations.mockResolvedValue(null);
 
       await expect(
         transactionService.update(transactionId, userId, { amount: 200 })

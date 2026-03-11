@@ -1,9 +1,9 @@
-import { AccountRepository } from './account.repository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
 import { CreateAccountDTO, UpdateAccountDTO } from './account.types';
 import { NotFoundError } from '../../shared/errors/AppError';
 
 export class AccountService {
-  constructor(private accountRepository: AccountRepository) {}
+  constructor(private accountRepository: IAccountRepository) {}
 
   async getAll(userId: string) {
     return this.accountRepository.findAll(userId);
@@ -18,13 +18,11 @@ export class AccountService {
   }
 
   async create(userId: string, data: CreateAccountDTO) {
-    return this.accountRepository.create({
+    return this.accountRepository.createWithInitialBalance({
+      userId,
       name: data.name,
       initialBalance: data.initialBalance,
       type: data.type,
-      monthlyIncome: data.monthlyIncome,
-      monthlyIncomeDay: data.monthlyIncomeDay,
-      user: { connect: { id: userId } },
     });
   }
 
@@ -34,7 +32,7 @@ export class AccountService {
     // Se está alterando o saldo, criar evento de ajuste
     if (
       data.currentBalance !== undefined &&
-      data.currentBalance !== Number(account.currentBalance)
+      data.currentBalance !== Number(account.initialBalance)
     ) {
       return this.accountRepository.updateWithBalanceAdjustment(id, account, data.currentBalance);
     }

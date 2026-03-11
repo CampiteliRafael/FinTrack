@@ -1,5 +1,5 @@
-import { UserRepository } from '../users/user.repository';
-import { RefreshTokenRepository } from './refresh-token.repository';
+import { IUserRepository } from '../../core/interfaces/IUserRepository';
+import { IRefreshTokenRepository } from '../../core/interfaces/IRefreshTokenRepository';
 import { HashUtil } from '../../shared/utils/hash.util';
 import { JwtUtil } from '../../shared/utils/jwt.util';
 import { jwtConfig } from '../../config/jwt';
@@ -11,8 +11,8 @@ import { logDebug } from '../../config/logger';
 
 export class AuthService {
   constructor(
-    private userRepository: UserRepository,
-    private refreshTokenRepository: RefreshTokenRepository
+    private userRepository: IUserRepository,
+    private refreshTokenRepository: IRefreshTokenRepository
   ) {}
 
   async register(data: RegisterDTO): Promise<AuthResponse> {

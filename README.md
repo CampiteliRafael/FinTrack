@@ -231,7 +231,7 @@ Consulte `DEPLOY.md` para instruções detalhadas.
 ## 📚 Documentação Técnica
 
 - [Frontend README](./Frontend/README.md) - Arquitetura, padrões e desenvolvimento do frontend
-- [Backend README](./Backend/README.md) - Arquitetura, API e desenvolvimento do backend
+- [Backend DOCUMENTATION](./Backend/DOCUMENTATION.md) - ⭐ **Clean Architecture completa, guia para novos desenvolvedores**
 - [Guia de Deploy](./DEPLOY.md) - Instruções completas de deploy
 - [API Documentation](https://fintrack-9iaq.onrender.com/api-docs) - Swagger/OpenAPI docs
 
@@ -241,19 +241,56 @@ Consulte `DEPLOY.md` para instruções detalhadas.
 
 Este projeto demonstra a aplicação prática de diversos conceitos avançados:
 
-- **Clean Architecture** - Separação em camadas (Repository, Service, Controller)
-- **Design Patterns** - Repository, Factory, Dependency Injection
-- **SOLID Principles** - Código manutenível e escalável
-- **RESTful API** - Endpoints bem estruturados
-- **Authentication & Authorization** - JWT e proteção de rotas
-- **Data Validation** - Schemas e sanitização
-- **Error Handling** - Tratamento centralizado de erros
-- **Async Processing** - Workers e filas
-- **Caching Strategy** - Redis para performance
-- **Database Migrations** - Versionamento do schema
+### Backend - Clean Architecture ⭐
+
+O backend foi completamente migrado para seguir os princípios da **Clean Architecture**:
+
+- **🎯 Core Layer** - Entidades de domínio com regras de negócio puras e interfaces de repositórios (Dependency Inversion Principle)
+- **🏗️ Infrastructure Layer** - Implementações concretas com Prisma, mappers para conversão de dados, e lógica de persistência
+- **📦 Application Layer** - Services que usam interfaces (não implementações), orquestram casos de uso e aplicam regras de negócio
+- **🌐 Presentation Layer** - Controllers HTTP, routes com dependency injection manual, e validações Zod
+
+**Benefícios Alcançados:**
+- ✅ **Testabilidade**: 91.9% de cobertura com mocks de interfaces
+- ✅ **Manutenibilidade**: Mudanças isoladas em cada camada
+- ✅ **Flexibilidade**: Trocar Prisma por outro ORM sem impactar services
+- ✅ **Escalabilidade**: Padrão consistente para adicionar novas features
+
+### Padrões de Design
+
+- **Repository Pattern** - Abstração do acesso a dados com interfaces
+- **Mapper Pattern** - Conversão entre Prisma e entidades de domínio
+- **Dependency Injection** - Injeção manual de dependências nas routes
+- **Strategy Pattern** - Diferentes estratégias de atualização de saldo
+- **Factory Pattern** - Criação de entidades validadas
+
+### Princípios SOLID
+
+- **Single Responsibility** - Cada classe tem uma única responsabilidade
+- **Open/Closed** - Aberto para extensão, fechado para modificação
+- **Liskov Substitution** - Implementações substituíveis via interfaces
+- **Interface Segregation** - Interfaces específicas por necessidade
+- **Dependency Inversion** - Dependa de abstrações, não de implementações concretas
+
+### Práticas Modernas
+
+- **RESTful API** - Endpoints bem estruturados e versionados
+- **Authentication & Authorization** - JWT com refresh tokens
+- **Data Validation** - Schemas Zod em toda entrada de dados
+- **Error Handling** - Tratamento centralizado com custom errors
+- **Async Processing** - Workers BullMQ para tarefas em background
+- **Caching Strategy** - Redis para otimização de performance
+- **Database Migrations** - Versionamento do schema com Prisma
+- **Audit Trail** - Eventos de auditoria para rastreabilidade
+- **Soft Delete** - Preservação de dados históricos
+- **Atomic Transactions** - Consistência de dados garantida
+
+### Frontend
+
 - **Responsive Design** - Mobile-first approach
-- **State Management** - Context API
+- **State Management** - Context API para estado global
 - **Performance Optimization** - Memoization e lazy loading
+- **Component Architecture** - Componentes reutilizáveis e modulares
 
 ---
 

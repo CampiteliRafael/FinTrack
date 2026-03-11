@@ -1,6 +1,6 @@
-import { TransactionRepository } from './transaction.repository';
-import { AccountRepository } from '../accounts/account.repository';
-import { CategoryRepository } from '../categories/category.repository';
+import { ITransactionRepository } from '../../core/interfaces/ITransactionRepository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import {
   CreateTransactionDTO,
   UpdateTransactionDTO,
@@ -11,9 +11,9 @@ import { ValidationUtil } from '../../shared/utils/validation.util';
 
 export class TransactionService {
   constructor(
-    private transactionRepository: TransactionRepository,
-    private accountRepository: AccountRepository,
-    private categoryRepository: CategoryRepository
+    private transactionRepository: ITransactionRepository,
+    private accountRepository: IAccountRepository,
+    private categoryRepository: ICategoryRepository
   ) {}
 
   async getAll(userId: string, filters: TransactionFilters) {
@@ -29,7 +29,6 @@ export class TransactionService {
   }
 
   async create(userId: string, data: CreateTransactionDTO) {
-    // ✅ Usar ValidationUtil para validar relacionamentos
     await ValidationUtil.validateAccountAndCategory(
       this.accountRepository,
       this.categoryRepository,
@@ -38,16 +37,15 @@ export class TransactionService {
       userId
     );
 
-    // Usar método que atualiza o saldo automaticamente
     return this.transactionRepository.createWithBalanceUpdate(
       {
+        userId,
+        accountId: data.accountId,
+        categoryId: data.categoryId,
         type: data.type,
         amount: data.amount,
         description: data.description,
         date: data.date,
-        user: { connect: { id: userId } },
-        account: { connect: { id: data.accountId } },
-        category: { connect: { id: data.categoryId } },
       },
       data.accountId,
       data.type,
@@ -56,13 +54,11 @@ export class TransactionService {
   }
 
   async update(id: string, userId: string, data: UpdateTransactionDTO) {
-    // ✅ Buscar transação com account incluído (necessário para updateWithBalanceUpdate)
-    const oldTransaction = await this.transactionRepository.findById(id, userId);
+    const oldTransaction = await this.transactionRepository.findByIdWithRelations(id, userId);
     if (!oldTransaction) {
       throw new NotFoundError('Transação não encontrada');
     }
 
-    // ✅ Usar ValidationUtil para validar relacionamentos
     if (data.accountId) {
       await ValidationUtil.validateAccount(this.accountRepository, data.accountId, userId);
     }
@@ -76,27 +72,18 @@ export class TransactionService {
       data.amount !== undefined || data.type !== undefined || data.accountId !== undefined;
 
     if (hasBalanceImpact) {
-      interface UpdateInput {
-        type?: 'income' | 'expense';
-        amount?: number;
-        description?: string | null;
-        date?: Date;
-        account?: { connect: { id: string } };
-        category?: { connect: { id: string } };
-      }
-
-      const updateInput: UpdateInput = {};
-      if (data.type) updateInput.type = data.type;
-      if (data.amount) updateInput.amount = data.amount;
-      if (data.description !== undefined) updateInput.description = data.description;
-      if (data.date) updateInput.date = data.date;
-      if (data.accountId) updateInput.account = { connect: { id: data.accountId } };
-      if (data.categoryId) updateInput.category = { connect: { id: data.categoryId } };
+      const updates: any = {};
+      if (data.type) updates.type = data.type;
+      if (data.amount) updates.amount = data.amount;
+      if (data.description !== undefined) updates.description = data.description;
+      if (data.date) updates.date = data.date;
+      if (data.accountId) updates.accountId = data.accountId;
+      if (data.categoryId) updates.categoryId = data.categoryId;
 
       return this.transactionRepository.updateWithBalanceUpdate(
         id,
         oldTransaction,
-        updateInput,
+        updates,
         data.amount ? Number(data.amount) : undefined,
         data.type,
         data.accountId
@@ -107,7 +94,6 @@ export class TransactionService {
   }
 
   async delete(id: string, userId: string) {
-    // ✅ Buscar transação com account incluído (necessário para softDeleteWithBalanceUpdate)
     const transaction = await this.transactionRepository.findById(id, userId);
     if (!transaction) {
       throw new NotFoundError('Transação não encontrada');

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { UserController } from './user.controller';
-import { UserRepository } from './user.repository';
+import { UserRepositoryImpl } from '../../infrastructure/database/repositories/UserRepositoryImpl';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { validate } from '../../shared/middlewares/validation.middleware';
 import { z } from 'zod';
@@ -8,7 +8,7 @@ import { strongPasswordSchema } from '../../shared/validators/password.validator
 
 const router = Router();
 
-const userRepository = new UserRepository();
+const userRepository = new UserRepositoryImpl();
 const userController = new UserController(userRepository);
 
 // Validation schemas

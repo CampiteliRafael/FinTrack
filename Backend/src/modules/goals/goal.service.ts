@@ -1,5 +1,5 @@
-import { GoalRepository } from './goal.repository';
-import { CategoryRepository } from '../categories/category.repository';
+import { IGoalRepository } from '../../core/interfaces/IGoalRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import { IGoal, CreateGoalData, UpdateGoalData, GoalFilters } from './goal.types';
 import { notificationService } from '../notifications/notification.service';
 import { NotificationType } from '../notifications/notification.types';
@@ -8,8 +8,8 @@ import { ValidationUtil } from '../../shared/utils/validation.util';
 
 export class GoalService {
   constructor(
-    private goalRepository: GoalRepository,
-    private categoryRepository: CategoryRepository
+    private goalRepository: IGoalRepository,
+    private categoryRepository: ICategoryRepository
   ) {}
 
   async getGoals(userId: string, filters: GoalFilters) {
@@ -25,16 +25,21 @@ export class GoalService {
   }
 
   async createGoal(userId: string, data: CreateGoalData): Promise<IGoal> {
-    // ✅ Usar ValidationUtil
     if (data.categoryId) {
       await ValidationUtil.validateCategory(this.categoryRepository, data.categoryId, userId);
     }
 
-    return this.goalRepository.create(userId, data);
+    return this.goalRepository.create({
+      userId,
+      name: data.name,
+      targetAmount: data.targetAmount,
+      currentAmount: 0,
+      deadline: data.deadline || null,
+      categoryId: data.categoryId || null,
+    });
   }
 
   async updateGoal(id: string, userId: string, data: UpdateGoalData): Promise<IGoal> {
-    // ✅ Usar ValidationUtil
     if (data.categoryId) {
       await ValidationUtil.validateCategory(this.categoryRepository, data.categoryId, userId);
     }

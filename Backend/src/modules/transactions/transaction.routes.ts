@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { TransactionRepository } from './transaction.repository';
+import { TransactionRepositoryImpl } from '../../infrastructure/database/repositories/TransactionRepositoryImpl';
 import { TransactionService } from './transaction.service';
 import { TransactionController } from './transaction.controller';
-import { AccountRepository } from '../accounts/account.repository';
-import { CategoryRepository } from '../categories/category.repository';
+import { AccountRepositoryImpl } from '../../infrastructure/database/repositories/AccountRepositoryImpl';
+import { CategoryRepositoryImpl } from '../../infrastructure/database/repositories/CategoryRepositoryImpl';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { validate, validateQuery, validateParams } from '../../shared/middlewares/validation.middleware';
 import { createTransactionSchema, updateTransactionSchema } from './transaction.schemas';
@@ -11,9 +11,9 @@ import { transactionFiltersSchema, uuidParamSchema } from '../../shared/validato
 
 const router = Router();
 
-const transactionRepository = new TransactionRepository();
-const accountRepository = new AccountRepository();
-const categoryRepository = new CategoryRepository();
+const transactionRepository = new TransactionRepositoryImpl();
+const accountRepository = new AccountRepositoryImpl();
+const categoryRepository = new CategoryRepositoryImpl();
 const transactionService = new TransactionService(
   transactionRepository,
   accountRepository,

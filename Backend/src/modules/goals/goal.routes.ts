@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { GoalController } from './goal.controller';
 import { GoalService } from './goal.service';
-import { GoalRepository } from './goal.repository';
-import { CategoryRepository } from '../categories/category.repository';
+import { GoalRepositoryImpl } from '../../infrastructure/database/repositories/GoalRepositoryImpl';
+import { CategoryRepositoryImpl } from '../../infrastructure/database/repositories/CategoryRepositoryImpl';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { validate, validateQuery, validateParams } from '../../shared/middlewares/validation.middleware';
 import { createGoalSchema, updateGoalSchema } from './goal.schemas';
@@ -10,8 +10,8 @@ import { goalFiltersSchema, uuidParamSchema } from '../../shared/validators/quer
 
 const router = Router();
 
-const goalRepository = new GoalRepository();
-const categoryRepository = new CategoryRepository();
+const goalRepository = new GoalRepositoryImpl();
+const categoryRepository = new CategoryRepositoryImpl();
 const goalService = new GoalService(goalRepository, categoryRepository);
 const goalController = new GoalController(goalService);
 

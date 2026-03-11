@@ -103,6 +103,389 @@ PostgreSQL Database
 Response
 ```
 
+### 🎯 Clean Architecture - Camadas Detalhadas
+
+O projeto foi migrado para seguir rigorosamente os princípios da **Clean Architecture**, garantindo separação de responsabilidades, testabilidade e manutenibilidade do código.
+
+#### 📦 1. Core Layer (Domínio)
+
+Contém as regras de negócio fundamentais, independente de frameworks e tecnologias externas.
+
+**Entidades de Domínio** (`src/core/entities/`)
+- `Account.ts` - Representa uma conta bancária com validações e métodos de negócio
+- `Transaction.ts` - Transação financeira (receita/despesa)
+- `Category.ts` - Categoria para organização de transações
+- `Goal.ts` - Meta financeira com cálculos de progresso
+- `Installment.ts` - Parcelamento com controle de pagamentos
+- `User.ts` - Usuário do sistema com validações de email
+- `RefreshToken.ts` - Token de atualização para autenticação
+
+**Características das Entidades:**
+```typescript
+// Exemplo: Account Entity
+export class Account {
+  constructor(
+    public readonly id: string,
+    public readonly userId: string,
+    public readonly name: string,
+    public readonly currentBalance: number,
+    public readonly availableBalance: number,
+    // ... outros campos
+  ) {
+    this.validate(); // Validação no construtor
+  }
+
+  // Métodos de negócio
+  getAvailableBalance(): number {
+    return this.currentBalance - this.reservedAmount;
+  }
+
+  isDeleted(): boolean {
+    return this.deletedAt !== null;
+  }
+}
+```
+
+**Interfaces de Repositório** (`src/core/interfaces/`)
+
+Definem contratos para acesso a dados, seguindo o **Dependency Inversion Principle**:
+
+```typescript
+// IAccountRepository.ts
+export interface IAccountRepository {
+  findById(id: string, userId: string): Promise<Account | null>;
+  findAll(userId: string): Promise<Account[]>;
+  create(account: CreateAccountData): Promise<Account>;
+  update(id: string, account: Partial<Account>): Promise<Account>;
+  softDelete(id: string): Promise<void>;
+
+  // Métodos especializados com lógica de negócio
+  createWithInitialBalance(account: CreateAccountData): Promise<Account>;
+  updateWithBalanceAdjustment(
+    id: string,
+    oldAccount: Account,
+    newBalance: number
+  ): Promise<Account>;
+}
+```
+
+**Value Objects** (`src/core/value-objects/`)
+- `Email.ts` - Validação e manipulação de emails
+- `Money.ts` - Representação de valores monetários com precisão
+
+#### 🏗️ 2. Infrastructure Layer
+
+Implementações concretas das interfaces, acesso a banco de dados e serviços externos.
+
+**Mappers** (`src/infrastructure/database/mappers/`)
+
+Convertem entre entidades do Prisma e entidades de domínio:
+
+```typescript
+// AccountMapper.ts
+export class AccountMapper {
+  // Prisma → Domain Entity
+  static toDomain(raw: PrismaAccount): Account {
+    return new Account(
+      raw.id,
+      raw.userId,
+      raw.name,
+      Number(raw.currentBalance), // Decimal → number
+      Number(raw.availableBalance),
+      // ...
+    );
+  }
+
+  // Domain Entity → Prisma
+  static toPrisma(domain: Account): PrismaAccount {
+    return {
+      id: domain.id,
+      userId: domain.userId,
+      currentBalance: new Decimal(domain.currentBalance),
+      // ...
+    } as PrismaAccount;
+  }
+}
+```
+
+**Implementações de Repositório** (`src/infrastructure/database/repositories/`)
+
+```typescript
+// AccountRepositoryImpl.ts
+export class AccountRepositoryImpl implements IAccountRepository {
+  async findById(id: string, userId: string): Promise<Account | null> {
+    const raw = await prisma.account.findFirst({
+      where: { id, userId, deletedAt: null }
+    });
+
+    return raw ? AccountMapper.toDomain(raw) : null;
+  }
+
+  async createWithInitialBalance(data: CreateAccountData): Promise<Account> {
+    // Transação atômica com criação de evento de auditoria
+    const raw = await prisma.$transaction(async (tx) => {
+      const account = await tx.account.create({
+        data: {
+          id: uuidv4(),
+          userId: data.userId,
+          name: data.name,
+          initialBalance: data.initialBalance,
+          currentBalance: data.initialBalance,
+          availableBalance: data.initialBalance,
+          // ...
+        }
+      });
+
+      // Evento de auditoria para rastreamento
+      await tx.accountEvent.create({
+        data: {
+          accountId: account.id,
+          type: 'initial_balance',
+          amount: data.initialBalance,
+          balanceBefore: 0,
+          balanceAfter: data.initialBalance,
+        }
+      });
+
+      return account;
+    });
+
+    return AccountMapper.toDomain(raw);
+  }
+}
+```
+
+**Principais Implementações:**
+- `AccountRepositoryImpl.ts` - Gestão de contas com eventos de auditoria
+- `TransactionRepositoryImpl.ts` - Transações com atualização de saldo atômica
+- `GoalRepositoryImpl.ts` - Metas com cálculo de progresso
+- `InstallmentRepositoryImpl.ts` - Parcelamentos com controle de estado
+- `CategoryRepositoryImpl.ts` - Categorias com soft delete
+- `UserRepositoryImpl.ts` - Usuários com hash de senha
+- `RefreshTokenRepositoryImpl.ts` - Tokens de autenticação
+
+#### 🎯 3. Application Layer (Services)
+
+Casos de uso e lógica de aplicação. Services usam **interfaces** em vez de implementações concretas:
+
+```typescript
+// account.service.ts
+export class AccountService {
+  constructor(
+    private accountRepository: IAccountRepository // Interface, não implementação!
+  ) {}
+
+  async create(userId: string, data: CreateAccountDTO) {
+    // Validações e regras de negócio
+    return this.accountRepository.createWithInitialBalance({
+      userId,
+      name: data.name,
+      initialBalance: data.initialBalance,
+      type: data.type,
+    });
+  }
+
+  async update(accountId: string, userId: string, data: UpdateAccountDTO) {
+    const existingAccount = await this.accountRepository.findById(accountId, userId);
+
+    if (!existingAccount) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+
+    // Se mudou o saldo, usa método especializado com evento de auditoria
+    if (data.currentBalance && data.currentBalance !== existingAccount.currentBalance) {
+      return this.accountRepository.updateWithBalanceAdjustment(
+        accountId,
+        existingAccount,
+        data.currentBalance
+      );
+    }
+
+    return this.accountRepository.update(accountId, data);
+  }
+}
+```
+
+**Utilitários de Validação Compartilhados:**
+
+```typescript
+// ValidationUtil.ts
+export class ValidationUtil {
+  static async validateAccount(
+    accountRepository: IAccountRepository,
+    accountId: string,
+    userId: string
+  ): Promise<void> {
+    const account = await accountRepository.findById(accountId, userId);
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+  }
+
+  static async validateAccountAndCategory(
+    accountRepository: IAccountRepository,
+    categoryRepository: ICategoryRepository,
+    accountId: string,
+    categoryId: string,
+    userId: string
+  ): Promise<void> {
+    await Promise.all([
+      this.validateAccount(accountRepository, accountId, userId),
+      this.validateCategory(categoryRepository, categoryId, userId),
+    ]);
+  }
+}
+```
+
+#### 🌐 4. Presentation Layer (Controllers & Routes)
+
+Camada HTTP que recebe requisições e chama os services:
+
+```typescript
+// account.routes.ts
+import { AccountRepositoryImpl } from '../../infrastructure/database/repositories/AccountRepositoryImpl';
+import { AccountService } from './account.service';
+
+// Instancia a implementação concreta
+const accountRepository = new AccountRepositoryImpl();
+const accountService = new AccountService(accountRepository);
+const accountController = new AccountController(accountService);
+
+router.post('/', authenticateToken, validate(createAccountSchema), accountController.create);
+```
+
+### 🔄 Dependency Injection & Inversion
+
+O projeto aplica o **Dependency Inversion Principle** (DIP) do SOLID:
+
+1. **Services dependem de interfaces**, não de implementações:
+   ```typescript
+   class TransactionService {
+     constructor(
+       private transactionRepository: ITransactionRepository, // Interface
+       private accountRepository: IAccountRepository,         // Interface
+       private categoryRepository: ICategoryRepository        // Interface
+     ) {}
+   }
+   ```
+
+2. **Routes injetam implementações concretas**:
+   ```typescript
+   const transactionRepository = new TransactionRepositoryImpl();
+   const accountRepository = new AccountRepositoryImpl();
+   const categoryRepository = new CategoryRepositoryImpl();
+
+   const transactionService = new TransactionService(
+     transactionRepository,
+     accountRepository,
+     categoryRepository
+   );
+   ```
+
+3. **Benefícios**:
+   - ✅ **Testabilidade**: Fácil criar mocks das interfaces
+   - ✅ **Flexibilidade**: Trocar implementações sem alterar services
+   - ✅ **Manutenibilidade**: Mudanças isoladas em cada camada
+   - ✅ **Escalabilidade**: Adicionar novas features seguindo o mesmo padrão
+
+### 🧪 Testes com Arquitetura Limpa
+
+Exemplo de teste unitário com mocks de interfaces:
+
+```typescript
+describe('TransactionService', () => {
+  let transactionService: TransactionService;
+  let mockTransactionRepository: jest.Mocked<ITransactionRepository>;
+  let mockAccountRepository: jest.Mocked<IAccountRepository>;
+
+  beforeEach(() => {
+    // Mock das interfaces, não das implementações concretas
+    mockTransactionRepository = {
+      findById: jest.fn(),
+      create: jest.fn(),
+      createWithBalanceUpdate: jest.fn(),
+      // ... outros métodos
+    } as jest.Mocked<ITransactionRepository>;
+
+    mockAccountRepository = {
+      findById: jest.fn(),
+      update: jest.fn(),
+      // ... outros métodos
+    } as jest.Mocked<IAccountRepository>;
+
+    transactionService = new TransactionService(
+      mockTransactionRepository,
+      mockAccountRepository,
+      mockCategoryRepository
+    );
+  });
+
+  it('should create transaction with balance update', async () => {
+    mockTransactionRepository.createWithBalanceUpdate.mockResolvedValue(mockTransaction);
+
+    const result = await transactionService.create(userId, createData);
+
+    expect(mockTransactionRepository.createWithBalanceUpdate).toHaveBeenCalled();
+    expect(result).toEqual(mockTransaction);
+  });
+});
+```
+
+### 🎨 Padrões de Design Aplicados
+
+1. **Repository Pattern**: Abstração do acesso a dados
+2. **Mapper Pattern**: Conversão entre camadas (Prisma ↔ Domain)
+3. **Factory Pattern**: Criação de entidades validadas
+4. **Strategy Pattern**: Diferentes estratégias de atualização de saldo
+5. **Dependency Injection**: Injeção manual de dependências
+
+### 📊 Fluxo Completo de uma Requisição
+
+```
+1. HTTP Request
+   ↓
+2. Express Middleware Stack
+   - Authentication (JWT)
+   - Validation (Zod)
+   ↓
+3. Controller (Presentation Layer)
+   - Extrai dados da requisição
+   - Chama o service apropriado
+   ↓
+4. Service (Application Layer)
+   - Valida regras de negócio
+   - Orquestra chamadas aos repositories
+   - Usa INTERFACES, não implementações
+   ↓
+5. Repository Implementation (Infrastructure Layer)
+   - Acessa o banco via Prisma
+   - Executa transações atômicas
+   - Cria eventos de auditoria
+   - Converte Prisma → Domain via Mapper
+   ↓
+6. Domain Entity (Core Layer)
+   - Valida dados no construtor
+   - Aplica métodos de negócio
+   ↓
+7. Repository retorna Domain Entity
+   ↓
+8. Service retorna para Controller
+   ↓
+9. Controller serializa resposta HTTP
+   ↓
+10. Response JSON enviado ao cliente
+```
+
+### 🔐 Preservação de Lógica Crítica
+
+Durante a migração, toda a lógica crítica foi preservada:
+
+✅ **Transações Atômicas**: Updates de saldo acontecem em transações Prisma
+✅ **Audit Trail**: Eventos de conta registram todas as mudanças
+✅ **Balance Consistency**: Saldo sempre consistente entre tabelas
+✅ **Soft Delete**: Dados nunca são perdidos, apenas marcados como deletados
+✅ **Validações de Negócio**: Movidas para entidades de domínio
+
 ---
 
 ## 📁 Estrutura do Projeto
@@ -110,68 +493,191 @@ Response
 ```
 Backend/
 ├── src/
-│   ├── config/                    # Configurações
-│   │   ├── database.ts           # Prisma Client
-│   │   ├── env.ts                # Variáveis de ambiente
-│   │   ├── jwt.ts                # JWT config
-│   │   ├── logger.ts             # Winston logger
-│   │   ├── redis.ts              # Redis client
-│   │   └── swagger.ts            # OpenAPI config
 │   │
-│   ├── modules/                  # Módulos de features
-│   │   ├── auth/                 # Autenticação
-│   │   ├── users/                # Usuários
-│   │   ├── accounts/             # Contas bancárias
-│   │   ├── categories/           # Categorias
-│   │   ├── transactions/         # Transações
-│   │   ├── goals/                # Metas financeiras
-│   │   ├── installments/         # Parcelamentos
-│   │   ├── dashboard/            # Dashboard
-│   │   ├── notifications/        # Notificações
-│   │   └── queues/               # Status das filas
+│   ├── 🎯 CORE LAYER (Domínio) ────────────────────────────
+│   ├── core/                           # Camada de domínio - regras de negócio puras
+│   │   │
+│   │   ├── entities/                   # ⭐ Entidades de domínio com validações
+│   │   │   ├── Account.ts             # Conta bancária + métodos de negócio
+│   │   │   ├── Transaction.ts         # Transação financeira
+│   │   │   ├── Category.ts            # Categoria de transação
+│   │   │   ├── Goal.ts                # Meta financeira + cálculo de progresso
+│   │   │   ├── Installment.ts         # Parcelamento + controle de pagamentos
+│   │   │   ├── User.ts                # Usuário + validações de email
+│   │   │   └── RefreshToken.ts        # Token de autenticação
+│   │   │
+│   │   ├── interfaces/                 # ⭐ Contratos de repositórios (DIP)
+│   │   │   ├── IAccountRepository.ts
+│   │   │   ├── ITransactionRepository.ts
+│   │   │   ├── ICategoryRepository.ts
+│   │   │   ├── IGoalRepository.ts
+│   │   │   ├── IInstallmentRepository.ts
+│   │   │   ├── IUserRepository.ts
+│   │   │   └── IRefreshTokenRepository.ts
+│   │   │
+│   │   └── value-objects/              # Objetos de valor imutáveis
+│   │       ├── Email.ts               # Email com validação
+│   │       └── Money.ts               # Valor monetário com precisão
 │   │
-│   ├── queues/                   # Sistema de filas
-│   │   ├── queue.config.ts       # Configuração BullMQ
-│   │   └── services/             # Queue services
-│   │       ├── cleanup-queue.service.ts
-│   │       └── monthly-income-queue.service.ts
+│   ├── 🏗️ INFRASTRUCTURE LAYER ────────────────────────────
+│   ├── infrastructure/                 # Implementações de infraestrutura
+│   │   └── database/
+│   │       │
+│   │       ├── mappers/               # ⭐ Conversão Prisma ↔ Domain
+│   │       │   ├── AccountMapper.ts
+│   │       │   ├── TransactionMapper.ts
+│   │       │   ├── CategoryMapper.ts
+│   │       │   ├── GoalMapper.ts
+│   │       │   ├── InstallmentMapper.ts
+│   │       │   ├── UserMapper.ts
+│   │       │   └── RefreshTokenMapper.ts
+│   │       │
+│   │       └── repositories/          # ⭐ Implementações concretas (Prisma)
+│   │           ├── AccountRepositoryImpl.ts        # + auditoria
+│   │           ├── TransactionRepositoryImpl.ts    # + update atômico de saldo
+│   │           ├── CategoryRepositoryImpl.ts       # + soft delete
+│   │           ├── GoalRepositoryImpl.ts           # + cálculo de progresso
+│   │           ├── InstallmentRepositoryImpl.ts    # + controle de estado
+│   │           ├── UserRepositoryImpl.ts           # + hash de senha
+│   │           └── RefreshTokenRepositoryImpl.ts   # + expiração
 │   │
-│   ├── workers/                  # Background workers
-│   │   ├── index.ts              # Entry point
-│   │   ├── cleanup.worker.ts     # Limpeza automática
-│   │   └── monthly-income.worker.ts  # Receitas mensais
+│   ├── 🎯 APPLICATION LAYER (Services) ────────────────────
+│   ├── modules/                        # Módulos de features (services + controllers)
+│   │   │
+│   │   ├── auth/                      # ⭐ Autenticação
+│   │   │   ├── auth.service.ts       # Lógica de autenticação (usa interfaces)
+│   │   │   ├── auth.controller.ts    # HTTP handlers
+│   │   │   ├── auth.routes.ts        # Rotas (injeta implementações)
+│   │   │   └── auth.schemas.ts       # Validação Zod
+│   │   │
+│   │   ├── accounts/                  # ⭐ Contas bancárias
+│   │   │   ├── account.service.ts    # Lógica de contas (usa IAccountRepository)
+│   │   │   ├── account.controller.ts
+│   │   │   ├── account.routes.ts     # Injeta AccountRepositoryImpl
+│   │   │   └── account.schemas.ts
+│   │   │
+│   │   ├── transactions/              # ⭐ Transações
+│   │   │   ├── transaction.service.ts # Usa ITransactionRepository + IAccountRepository
+│   │   │   ├── transaction.controller.ts
+│   │   │   ├── transaction.routes.ts  # Injeta implementações
+│   │   │   └── transaction.schemas.ts
+│   │   │
+│   │   ├── categories/                # Categorias
+│   │   │   ├── category.service.ts
+│   │   │   ├── category.controller.ts
+│   │   │   └── category.routes.ts
+│   │   │
+│   │   ├── goals/                     # Metas financeiras
+│   │   │   ├── goal.service.ts       # Usa IGoalRepository + ICategoryRepository
+│   │   │   ├── goal.controller.ts
+│   │   │   └── goal.routes.ts
+│   │   │
+│   │   ├── installments/              # Parcelamentos
+│   │   │   ├── installment.service.ts # Usa IInstallmentRepository
+│   │   │   ├── installment.controller.ts
+│   │   │   └── installment.routes.ts
+│   │   │
+│   │   ├── users/                     # Usuários
+│   │   │   ├── user.controller.ts    # Usa IUserRepository
+│   │   │   └── user.routes.ts
+│   │   │
+│   │   ├── dashboard/                 # Dashboard
+│   │   │   ├── dashboard.service.ts
+│   │   │   └── dashboard.controller.ts
+│   │   │
+│   │   ├── notifications/             # Notificações
+│   │   │   ├── notification.service.ts
+│   │   │   └── notification.controller.ts
+│   │   │
+│   │   └── queues/                    # Status das filas
+│   │       └── queue.controller.ts
 │   │
-│   ├── shared/                   # Código compartilhado
-│   │   ├── cache/                # Redis cache
-│   │   ├── errors/               # Erros customizados
-│   │   ├── middlewares/          # Middlewares globais
-│   │   └── utils/                # Utilitários
+│   ├── 🌐 PRESENTATION LAYER ──────────────────────────────
+│   ├── config/                        # Configurações globais
+│   │   ├── database.ts               # Prisma Client singleton
+│   │   ├── env.ts                    # Variáveis de ambiente
+│   │   ├── jwt.ts                    # Configuração JWT
+│   │   ├── logger.ts                 # Winston logger
+│   │   ├── redis.ts                  # Cliente Redis
+│   │   └── swagger.ts                # OpenAPI/Swagger
 │   │
-│   ├── core/                     # Domain layer (legacy)
-│   │   ├── entities/
-│   │   ├── interfaces/
-│   │   └── value-objects/
+│   ├── shared/                        # Código compartilhado entre camadas
+│   │   │
+│   │   ├── middlewares/              # Middlewares Express
+│   │   │   ├── auth.middleware.ts    # Autenticação JWT
+│   │   │   ├── error.middleware.ts   # Tratamento global de erros
+│   │   │   ├── validation.middleware.ts # Validação Zod
+│   │   │   └── rate-limit.middleware.ts
+│   │   │
+│   │   ├── errors/                    # Erros customizados
+│   │   │   └── AppError.ts           # NotFoundError, UnauthorizedError, etc.
+│   │   │
+│   │   ├── utils/                     # Utilitários
+│   │   │   ├── validation.util.ts    # Validações compartilhadas
+│   │   │   ├── hash.util.ts          # Bcrypt helpers
+│   │   │   └── jwt.util.ts           # JWT helpers
+│   │   │
+│   │   └── cache/                     # Cache Redis
+│   │       └── cache.service.ts
 │   │
-│   ├── infrastructure/           # Infrastructure layer (legacy)
-│   │   ├── database/
-│   │   ├── http/
-│   │   ├── mappers/
-│   │   └── repositories/
+│   ├── 🔄 ASYNC PROCESSING ────────────────────────────────
+│   ├── queues/                        # Sistema de filas BullMQ
+│   │   ├── queue.config.ts           # Configuração BullMQ
+│   │   └── services/
+│   │       ├── cleanup-queue.service.ts      # Limpeza de dados antigos
+│   │       └── monthly-income-queue.service.ts # Receitas mensais
 │   │
-│   ├── __tests__/               # Testes unitários
-│   ├── app.ts                   # Express app setup
-│   └── server.ts                # HTTP server
+│   ├── workers/                       # Background workers
+│   │   ├── index.ts                  # Entry point dos workers
+│   │   ├── cleanup.worker.ts         # Worker de limpeza
+│   │   └── monthly-income.worker.ts  # Worker de receitas
+│   │
+│   ├── 🧪 TESTS ───────────────────────────────────────────
+│   ├── __tests__/
+│   │   ├── unit/                     # Testes unitários (com mocks)
+│   │   │   ├── account.service.test.ts
+│   │   │   ├── transaction.service.test.ts
+│   │   │   ├── goal.service.test.ts
+│   │   │   ├── installment.service.test.ts
+│   │   │   └── auth.service.test.ts
+│   │   │
+│   │   └── integration/               # Testes de integração
+│   │       └── auth.controller.test.ts
+│   │
+│   ├── app.ts                         # Express app setup
+│   └── server.ts                      # HTTP server bootstrap
 │
-├── prisma/
-│   ├── schema.prisma            # Schema do banco
-│   └── migrations/              # Migrações
+├── prisma/                            # Prisma ORM
+│   ├── schema.prisma                 # Schema do banco de dados
+│   └── migrations/                   # Migrações versionadas
 │
-├── docs/
-│   └── openapi.yaml             # Documentação API
+├── docs/                              # Documentação
+│   └── openapi.yaml                  # Especificação OpenAPI
 │
-├── .env                         # Variáveis de ambiente
-├── tsconfig.json                # TypeScript config
-└── package.json                 # Dependências
+├── .env.example                       # Template de variáveis de ambiente
+├── tsconfig.json                      # Configuração TypeScript
+├── jest.config.js                     # Configuração de testes
+├── package.json                       # Dependências e scripts
+└── DOCUMENTATION.md                   # Este arquivo
+```
+
+### 📦 Estrutura de um Módulo (Exemplo: Accounts)
+
+```
+modules/accounts/
+├── account.service.ts         # ⭐ Application Layer
+│   └── Depende de: IAccountRepository (interface)
+│
+├── account.controller.ts      # 🌐 Presentation Layer
+│   └── Depende de: AccountService
+│
+├── account.routes.ts          # 🔌 Dependency Injection
+│   ├── Instancia: AccountRepositoryImpl (concrete)
+│   ├── Injeta no: AccountService (interface)
+│   └── Registra rotas Express
+│
+├── account.schemas.ts         # Validação de entrada (Zod)
+└── account.types.ts           # DTOs e tipos compartilhados
 ```
 
 ---
@@ -1998,6 +2504,563 @@ tail -f logs/error.log
 
 ---
 
+## 👨‍💻 Guia para Novos Desenvolvedores
+
+### 🎓 Entendendo a Arquitetura
+
+Se você é novo no projeto, comece entendendo as camadas:
+
+1. **Core Layer** (`src/core/`) - **Leia primeiro!**
+   - Entidades com regras de negócio puras
+   - Interfaces que definem contratos
+   - Independente de frameworks
+
+2. **Infrastructure Layer** (`src/infrastructure/`)
+   - Implementações concretas usando Prisma
+   - Mappers que convertem entre Prisma e Domain
+   - Lógica de persistência e acesso a dados
+
+3. **Application Layer** (`src/modules/`)
+   - Services com casos de uso
+   - Controllers que lidam com HTTP
+   - Routes que injetam dependências
+
+4. **Shared Layer** (`src/shared/`)
+   - Middlewares, erros, utilitários
+   - Código reutilizável entre módulos
+
+### 🚀 Como Adicionar uma Nova Feature
+
+#### Exemplo: Adicionar módulo de "Budget" (Orçamento)
+
+**1. Core Layer - Defina a Entidade de Domínio**
+
+```typescript
+// src/core/entities/Budget.ts
+export class Budget {
+  constructor(
+    public readonly id: string,
+    public readonly userId: string,
+    public readonly categoryId: string,
+    public readonly amount: number,
+    public readonly month: number,
+    public readonly year: number,
+    public readonly createdAt: Date,
+    public readonly updatedAt: Date,
+    public readonly deletedAt: Date | null
+  ) {
+    this.validate();
+  }
+
+  private validate(): void {
+    if (this.amount <= 0) {
+      throw new Error('Budget amount must be positive');
+    }
+    if (this.month < 1 || this.month > 12) {
+      throw new Error('Invalid month');
+    }
+  }
+
+  isActive(): boolean {
+    return this.deletedAt === null;
+  }
+
+  getRemainingAmount(spent: number): number {
+    return Math.max(0, this.amount - spent);
+  }
+}
+```
+
+**2. Core Layer - Defina a Interface do Repositório**
+
+```typescript
+// src/core/interfaces/IBudgetRepository.ts
+import { Budget } from '../entities/Budget';
+
+export type CreateBudgetData = {
+  userId: string;
+  categoryId: string;
+  amount: number;
+  month: number;
+  year: number;
+};
+
+export interface IBudgetRepository {
+  findById(id: string, userId: string): Promise<Budget | null>;
+  findAll(userId: string, filters?: BudgetFilters): Promise<Budget[]>;
+  create(budget: CreateBudgetData): Promise<Budget>;
+  update(id: string, data: Partial<Budget>): Promise<Budget>;
+  softDelete(id: string): Promise<void>;
+
+  // Métodos especializados
+  findByMonthAndYear(userId: string, month: number, year: number): Promise<Budget[]>;
+  checkExistingBudget(userId: string, categoryId: string, month: number, year: number): Promise<Budget | null>;
+}
+```
+
+**3. Infrastructure Layer - Crie o Mapper**
+
+```typescript
+// src/infrastructure/database/mappers/BudgetMapper.ts
+import { Budget as PrismaBudget } from '@prisma/client';
+import { Budget } from '../../../core/entities/Budget';
+
+export class BudgetMapper {
+  static toDomain(raw: PrismaBudget): Budget {
+    return new Budget(
+      raw.id,
+      raw.userId,
+      raw.categoryId,
+      Number(raw.amount),
+      raw.month,
+      raw.year,
+      raw.createdAt,
+      raw.updatedAt,
+      raw.deletedAt
+    );
+  }
+
+  static toPrisma(domain: Budget): PrismaBudget {
+    return {
+      id: domain.id,
+      userId: domain.userId,
+      categoryId: domain.categoryId,
+      amount: new Decimal(domain.amount),
+      month: domain.month,
+      year: domain.year,
+      createdAt: domain.createdAt,
+      updatedAt: domain.updatedAt,
+      deletedAt: domain.deletedAt,
+    } as PrismaBudget;
+  }
+}
+```
+
+**4. Infrastructure Layer - Implemente o Repositório**
+
+```typescript
+// src/infrastructure/database/repositories/BudgetRepositoryImpl.ts
+import { IBudgetRepository, CreateBudgetData } from '../../../core/interfaces/IBudgetRepository';
+import { Budget } from '../../../core/entities/Budget';
+import { BudgetMapper } from '../mappers/BudgetMapper';
+import { prisma } from '../../../config/database';
+import { v4 as uuidv4 } from 'uuid';
+
+export class BudgetRepositoryImpl implements IBudgetRepository {
+  async findById(id: string, userId: string): Promise<Budget | null> {
+    const raw = await prisma.budget.findFirst({
+      where: {
+        id,
+        userId,
+        deletedAt: null
+      }
+    });
+
+    return raw ? BudgetMapper.toDomain(raw) : null;
+  }
+
+  async findAll(userId: string): Promise<Budget[]> {
+    const rawBudgets = await prisma.budget.findMany({
+      where: {
+        userId,
+        deletedAt: null
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return rawBudgets.map(BudgetMapper.toDomain);
+  }
+
+  async create(data: CreateBudgetData): Promise<Budget> {
+    const raw = await prisma.budget.create({
+      data: {
+        id: uuidv4(),
+        userId: data.userId,
+        categoryId: data.categoryId,
+        amount: data.amount,
+        month: data.month,
+        year: data.year,
+      }
+    });
+
+    return BudgetMapper.toDomain(raw);
+  }
+
+  async update(id: string, data: Partial<Budget>): Promise<Budget> {
+    const raw = await prisma.budget.update({
+      where: { id },
+      data: {
+        amount: data.amount,
+        month: data.month,
+        year: data.year,
+        updatedAt: new Date(),
+      }
+    });
+
+    return BudgetMapper.toDomain(raw);
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await prisma.budget.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
+  }
+
+  async checkExistingBudget(
+    userId: string,
+    categoryId: string,
+    month: number,
+    year: number
+  ): Promise<Budget | null> {
+    const raw = await prisma.budget.findFirst({
+      where: {
+        userId,
+        categoryId,
+        month,
+        year,
+        deletedAt: null
+      }
+    });
+
+    return raw ? BudgetMapper.toDomain(raw) : null;
+  }
+}
+```
+
+**5. Application Layer - Crie o Service**
+
+```typescript
+// src/modules/budgets/budget.service.ts
+import { IBudgetRepository } from '../../core/interfaces/IBudgetRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
+import { NotFoundError, ConflictError } from '../../shared/errors/AppError';
+import { ValidationUtil } from '../../shared/utils/validation.util';
+
+export class BudgetService {
+  constructor(
+    private budgetRepository: IBudgetRepository,      // Interface!
+    private categoryRepository: ICategoryRepository    // Interface!
+  ) {}
+
+  async create(userId: string, data: CreateBudgetDTO) {
+    // Valida se categoria existe
+    await ValidationUtil.validateCategory(
+      this.categoryRepository,
+      data.categoryId,
+      userId
+    );
+
+    // Verifica se já existe orçamento para essa categoria/período
+    const existing = await this.budgetRepository.checkExistingBudget(
+      userId,
+      data.categoryId,
+      data.month,
+      data.year
+    );
+
+    if (existing) {
+      throw new ConflictError('Já existe um orçamento para esta categoria neste período');
+    }
+
+    return this.budgetRepository.create({
+      userId,
+      categoryId: data.categoryId,
+      amount: data.amount,
+      month: data.month,
+      year: data.year,
+    });
+  }
+
+  async getAll(userId: string) {
+    return this.budgetRepository.findAll(userId);
+  }
+
+  async getById(id: string, userId: string) {
+    const budget = await this.budgetRepository.findById(id, userId);
+
+    if (!budget) {
+      throw new NotFoundError('Orçamento não encontrado');
+    }
+
+    return budget;
+  }
+
+  async update(id: string, userId: string, data: UpdateBudgetDTO) {
+    const existing = await this.budgetRepository.findById(id, userId);
+
+    if (!existing) {
+      throw new NotFoundError('Orçamento não encontrado');
+    }
+
+    return this.budgetRepository.update(id, data);
+  }
+
+  async delete(id: string, userId: string) {
+    const existing = await this.budgetRepository.findById(id, userId);
+
+    if (!existing) {
+      throw new NotFoundError('Orçamento não encontrado');
+    }
+
+    await this.budgetRepository.softDelete(id);
+  }
+}
+```
+
+**6. Presentation Layer - Crie Controller e Routes**
+
+```typescript
+// src/modules/budgets/budget.controller.ts
+import { Request, Response } from 'express';
+import { BudgetService } from './budget.service';
+import { asyncHandler } from '../../shared/utils/asyncHandler';
+
+export class BudgetController {
+  constructor(private budgetService: BudgetService) {}
+
+  create = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const budget = await this.budgetService.create(userId, req.body);
+
+    res.status(201).json(budget);
+  });
+
+  getAll = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const budgets = await this.budgetService.getAll(userId);
+
+    res.json(budgets);
+  });
+
+  getById = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const budget = await this.budgetService.getById(req.params.id, userId);
+
+    res.json(budget);
+  });
+
+  update = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const budget = await this.budgetService.update(req.params.id, userId, req.body);
+
+    res.json(budget);
+  });
+
+  delete = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    await this.budgetService.delete(req.params.id, userId);
+
+    res.status(204).send();
+  });
+}
+```
+
+```typescript
+// src/modules/budgets/budget.routes.ts
+import { Router } from 'express';
+import { BudgetController } from './budget.controller';
+import { BudgetService } from './budget.service';
+import { BudgetRepositoryImpl } from '../../infrastructure/database/repositories/BudgetRepositoryImpl';
+import { CategoryRepositoryImpl } from '../../infrastructure/database/repositories/CategoryRepositoryImpl';
+import { authenticateToken } from '../../shared/middlewares/auth.middleware';
+import { validate } from '../../shared/middlewares/validation.middleware';
+import { createBudgetSchema, updateBudgetSchema } from './budget.schemas';
+
+const router = Router();
+
+// 🔌 DEPENDENCY INJECTION - Instancia implementações concretas
+const budgetRepository = new BudgetRepositoryImpl();
+const categoryRepository = new CategoryRepositoryImpl();
+
+// Injeta no service (que depende de interfaces)
+const budgetService = new BudgetService(budgetRepository, categoryRepository);
+const budgetController = new BudgetController(budgetService);
+
+// Rotas protegidas
+router.use(authenticateToken);
+
+router.post('/', validate(createBudgetSchema), budgetController.create);
+router.get('/', budgetController.getAll);
+router.get('/:id', budgetController.getById);
+router.put('/:id', validate(updateBudgetSchema), budgetController.update);
+router.delete('/:id', budgetController.delete);
+
+export default router;
+```
+
+**7. Adicione Validações (Zod)**
+
+```typescript
+// src/modules/budgets/budget.schemas.ts
+import { z } from 'zod';
+
+export const createBudgetSchema = z.object({
+  body: z.object({
+    categoryId: z.string().uuid('ID de categoria inválido'),
+    amount: z.number().positive('Valor deve ser positivo'),
+    month: z.number().int().min(1).max(12, 'Mês deve estar entre 1 e 12'),
+    year: z.number().int().min(2020).max(2100, 'Ano inválido'),
+  })
+});
+
+export const updateBudgetSchema = z.object({
+  body: z.object({
+    amount: z.number().positive().optional(),
+    month: z.number().int().min(1).max(12).optional(),
+    year: z.number().int().min(2020).max(2100).optional(),
+  })
+});
+```
+
+**8. Crie Testes Unitários**
+
+```typescript
+// src/__tests__/unit/budget.service.test.ts
+import { BudgetService } from '../../modules/budgets/budget.service';
+import { IBudgetRepository } from '../../core/interfaces/IBudgetRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
+
+describe('BudgetService', () => {
+  let budgetService: BudgetService;
+  let mockBudgetRepository: jest.Mocked<IBudgetRepository>;
+  let mockCategoryRepository: jest.Mocked<ICategoryRepository>;
+
+  beforeEach(() => {
+    mockBudgetRepository = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+      checkExistingBudget: jest.fn(),
+    } as jest.Mocked<IBudgetRepository>;
+
+    mockCategoryRepository = {
+      findById: jest.fn(),
+      // ... outros métodos
+    } as jest.Mocked<ICategoryRepository>;
+
+    budgetService = new BudgetService(
+      mockBudgetRepository,
+      mockCategoryRepository
+    );
+  });
+
+  describe('create', () => {
+    it('should create budget successfully', async () => {
+      const mockBudget = { id: '1', amount: 1000, /* ... */ };
+
+      mockCategoryRepository.findById.mockResolvedValue(mockCategory);
+      mockBudgetRepository.checkExistingBudget.mockResolvedValue(null);
+      mockBudgetRepository.create.mockResolvedValue(mockBudget as any);
+
+      const result = await budgetService.create(userId, createData);
+
+      expect(result).toEqual(mockBudget);
+      expect(mockBudgetRepository.create).toHaveBeenCalled();
+    });
+
+    it('should throw error if budget already exists', async () => {
+      mockCategoryRepository.findById.mockResolvedValue(mockCategory);
+      mockBudgetRepository.checkExistingBudget.mockResolvedValue(existingBudget);
+
+      await expect(
+        budgetService.create(userId, createData)
+      ).rejects.toThrow('Já existe um orçamento');
+    });
+  });
+});
+```
+
+**9. Registre a Rota no App**
+
+```typescript
+// src/app.ts
+import budgetRoutes from './modules/budgets/budget.routes';
+
+// ... outras rotas
+app.use('/api/v1/budgets', budgetRoutes);
+```
+
+### ✅ Checklist para Nova Feature
+
+- [ ] **Core Layer**
+  - [ ] Entidade de domínio criada com validações
+  - [ ] Interface de repositório definida
+  - [ ] Value objects (se necessário)
+
+- [ ] **Infrastructure Layer**
+  - [ ] Mapper criado (Prisma ↔ Domain)
+  - [ ] Implementação do repositório
+  - [ ] Schema Prisma atualizado
+  - [ ] Migration criada e executada
+
+- [ ] **Application Layer**
+  - [ ] Service criado usando interfaces
+  - [ ] Controller criado
+  - [ ] Routes configuradas com DI
+  - [ ] DTOs e types definidos
+  - [ ] Schemas Zod para validação
+
+- [ ] **Tests**
+  - [ ] Testes unitários do service
+  - [ ] Testes de integração (opcional)
+  - [ ] Coverage > 80%
+
+- [ ] **Documentation**
+  - [ ] Swagger/OpenAPI atualizado
+  - [ ] README atualizado
+  - [ ] Comentários no código
+
+### 🐛 Como Debugar
+
+**1. Logs Estruturados**
+```typescript
+import { logDebug, logError } from '../config/logger';
+
+// Em qualquer service
+logDebug('Creating budget', { userId, data });
+logError('Failed to create budget', { error, userId });
+```
+
+**2. Prisma Studio**
+```bash
+npx prisma studio
+# Abre interface visual do banco em http://localhost:5555
+```
+
+**3. Debug no VSCode**
+Crie `.vscode/launch.json`:
+```json
+{
+  "type": "node",
+  "request": "launch",
+  "name": "Debug Backend",
+  "runtimeArgs": ["-r", "ts-node/register"],
+  "args": ["${workspaceFolder}/src/server.ts"],
+  "env": { "NODE_ENV": "development" }
+}
+```
+
+### 📚 Recursos Úteis
+
+- **Clean Architecture**: [Uncle Bob's Blog](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- **SOLID Principles**: [Digital Ocean Guide](https://www.digitalocean.com/community/conceptual_articles/s-o-l-i-d-the-first-five-principles-of-object-oriented-design)
+- **Prisma Docs**: https://www.prisma.io/docs
+- **Express Best Practices**: https://expressjs.com/en/advanced/best-practice-security.html
+
+### 💡 Dicas Importantes
+
+1. **Sempre use interfaces nos services**, nunca implementações concretas
+2. **Mappers são essenciais** - mantenha separação entre Prisma e Domain
+3. **Valide no construtor das entidades** - regras de negócio no domínio
+4. **Transações atômicas** - use `prisma.$transaction()` para operações críticas
+5. **Soft delete sempre** - nunca delete permanentemente
+6. **Teste com mocks de interfaces** - não teste implementações de repositório nos testes de service
+
+---
+
 ## 🤝 Contribuindo
 
 ### Padrões de Código
@@ -2028,5 +3091,5 @@ Para dúvidas ou problemas, consulte:
 
 ---
 
-**Última atualização:** 02/03/2026
-**Versão:** 1.0.0
+**Última atualização:** 11/03/2026 - Clean Architecture Migration Completed ✅
+**Versão:** 2.0.0

@@ -1,6 +1,6 @@
-import { InstallmentRepository } from './installment.repository';
-import { AccountRepository } from '../accounts/account.repository';
-import { CategoryRepository } from '../categories/category.repository';
+import { IInstallmentRepository } from '../../core/interfaces/IInstallmentRepository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import {
   IInstallment,
   CreateInstallmentData,
@@ -12,9 +12,9 @@ import { ValidationUtil } from '../../shared/utils/validation.util';
 
 export class InstallmentService {
   constructor(
-    private installmentRepository: InstallmentRepository,
-    private accountRepository: AccountRepository,
-    private categoryRepository: CategoryRepository
+    private installmentRepository: IInstallmentRepository,
+    private accountRepository: IAccountRepository,
+    private categoryRepository: ICategoryRepository
   ) {}
 
   async getInstallments(userId: string, filters: InstallmentFilters) {
@@ -30,7 +30,6 @@ export class InstallmentService {
   }
 
   async createInstallment(userId: string, data: CreateInstallmentData): Promise<IInstallment> {
-    // ✅ Usar ValidationUtil
     await ValidationUtil.validateAccountAndCategory(
       this.accountRepository,
       this.categoryRepository,
@@ -39,7 +38,17 @@ export class InstallmentService {
       userId
     );
 
-    return this.installmentRepository.create(userId, data);
+    return this.installmentRepository.create({
+      userId,
+      transactionId: null,
+      description: data.description,
+      totalAmount: data.totalAmount,
+      installments: data.installments,
+      currentInstallment: 0,
+      accountId: data.accountId,
+      categoryId: data.categoryId,
+      startDate: data.startDate,
+    });
   }
 
   async updateInstallment(
@@ -47,7 +56,6 @@ export class InstallmentService {
     userId: string,
     data: UpdateInstallmentData
   ): Promise<IInstallment> {
-    // ✅ Usar ValidationUtil
     if (data.accountId) {
       await ValidationUtil.validateAccount(this.accountRepository, data.accountId, userId);
     }

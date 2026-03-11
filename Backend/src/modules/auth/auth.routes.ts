@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UserRepository } from '../users/user.repository';
-import { RefreshTokenRepository } from './refresh-token.repository';
+import { UserRepositoryImpl } from '../../infrastructure/database/repositories/UserRepositoryImpl';
+import { RefreshTokenRepositoryImpl } from '../../infrastructure/database/repositories/RefreshTokenRepositoryImpl';
 import { validate } from '../../shared/middlewares/validation.middleware';
 import {
   registerSchema,
@@ -14,8 +14,8 @@ import {
 
 const router = Router();
 
-const userRepository = new UserRepository();
-const refreshTokenRepository = new RefreshTokenRepository();
+const userRepository = new UserRepositoryImpl();
+const refreshTokenRepository = new RefreshTokenRepositoryImpl();
 const authService = new AuthService(userRepository, refreshTokenRepository);
 const authController = new AuthController(authService);
 

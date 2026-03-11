@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import { UserRepository } from './user.repository';
+import { IUserRepository } from '../../core/interfaces/IUserRepository';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
 import { HashUtil } from '../../shared/utils/hash.util';
 import { NotFoundError, ConflictError, UnauthorizedError } from '../../shared/errors/AppError';
 
 export class UserController {
-  constructor(private userRepository: UserRepository) {}
+  constructor(private userRepository: IUserRepository) {}
 
   getMe = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user!.userId;
@@ -56,16 +56,13 @@ export class UserController {
       throw new NotFoundError('Usuário não encontrado');
     }
 
-    // ✅ Usar HashUtil ao invés de bcrypt direto
     const isPasswordValid = await HashUtil.compare(currentPassword, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedError('Senha atual incorreta');
     }
 
-    // ✅ Usar HashUtil ao invés de bcrypt direto
     const newPasswordHash = await HashUtil.hash(newPassword);
 
-    // Atualizar senha
     await this.userRepository.updatePassword(userId, newPasswordHash);
 
     res.json({ message: 'Senha atualizada com sucesso' });

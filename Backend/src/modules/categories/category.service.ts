@@ -1,9 +1,9 @@
-import { CategoryRepository } from './category.repository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import { CreateCategoryDTO, UpdateCategoryDTO } from './category.types';
 import { NotFoundError } from '../../shared/errors/AppError';
 
 export class CategoryService {
-  constructor(private categoryRepository: CategoryRepository) {}
+  constructor(private categoryRepository: ICategoryRepository) {}
 
   async getAll(userId: string) {
     return this.categoryRepository.findAll(userId);
@@ -19,10 +19,10 @@ export class CategoryService {
 
   async create(userId: string, data: CreateCategoryDTO) {
     return this.categoryRepository.create({
+      userId,
       name: data.name,
       color: data.color,
       icon: data.icon,
-      user: { connect: { id: userId } },
     });
   }
 

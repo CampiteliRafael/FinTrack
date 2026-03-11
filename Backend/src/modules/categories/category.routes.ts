@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { CategoryRepository } from './category.repository';
+import { CategoryRepositoryImpl } from '../../infrastructure/database/repositories/CategoryRepositoryImpl';
 import { CategoryService } from './category.service';
 import { CategoryController } from './category.controller';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
@@ -9,7 +9,7 @@ import { uuidParamSchema } from '../../shared/validators/query.validator';
 
 const router = Router();
 
-const categoryRepository = new CategoryRepository();
+const categoryRepository = new CategoryRepositoryImpl();
 const categoryService = new CategoryService(categoryRepository);
 const categoryController = new CategoryController(categoryService);
 

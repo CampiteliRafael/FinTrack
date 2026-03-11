@@ -1,5 +1,5 @@
-import { AccountRepository } from '../../modules/accounts/account.repository';
-import { CategoryRepository } from '../../modules/categories/category.repository';
+import { IAccountRepository } from '../../core/interfaces/IAccountRepository';
+import { ICategoryRepository } from '../../core/interfaces/ICategoryRepository';
 import { NotFoundError } from '../errors/AppError';
 
 /**
@@ -10,7 +10,7 @@ export class ValidationUtil {
    * Valida se uma conta existe e pertence ao usuário
    */
   static async validateAccount(
-    accountRepository: AccountRepository,
+    accountRepository: IAccountRepository,
     accountId: string,
     userId: string
   ): Promise<void> {
@@ -24,7 +24,7 @@ export class ValidationUtil {
    * Valida se uma categoria existe e pertence ao usuário
    */
   static async validateCategory(
-    categoryRepository: CategoryRepository,
+    categoryRepository: ICategoryRepository,
     categoryId: string,
     userId: string
   ): Promise<void> {
@@ -38,8 +38,8 @@ export class ValidationUtil {
    * Valida conta e categoria em uma única chamada
    */
   static async validateAccountAndCategory(
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
+    accountRepository: IAccountRepository,
+    categoryRepository: ICategoryRepository,
     accountId: string,
     categoryId: string,
     userId: string
