@@ -3,12 +3,11 @@
 <div align="center">
 
 ![FinTrack Banner](https://img.shields.io/badge/FinTrack-Gestão_Financeira-blue?style=for-the-badge)
-[![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen?style=for-the-badge)](https://fintrack.vercel.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 
 **Sistema completo de gestão financeira pessoal com recursos avançados de planejamento e controle**
 
-[🚀 Demo ao Vivo](https://fintrack-nu-cyan.vercel.app/) • [📚 API Docs](https://fintrack-9iaq.onrender.com/api-docs) • [📖 Documentação Técnica](#documentação-técnica)
+ • [📖 Documentação Técnica](#documentação-técnica)
 
 </div>
 
